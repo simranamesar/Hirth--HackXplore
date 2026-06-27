@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>TwoStrokeGPT</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
   <style>
     :root {
       --fg:#1c1917; --muted:#78716c; --bg:#fafaf9; --card:#fff;
@@ -11,16 +12,17 @@
     }
     * { box-sizing: border-box; }
     body { font-family: ui-sans-serif, system-ui, sans-serif; margin:0; background:var(--bg); color:var(--fg); }
-    header { padding:14px 24px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:16px; }
+    header { padding:14px 24px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
     header h1 { font-size:16px; font-weight:700; margin:0; flex:1; }
     .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:16px; }
-    main { max-width:860px; margin:0 auto; padding:24px; }
-    .row { display:flex; gap:8px; align-items:center; }
-    input[type=text] { flex:1; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:14px; }
+    main { max-width:920px; margin:0 auto; padding:24px; }
+    .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    input[type=text] { flex:1; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:14px; min-width:0; }
     button { padding:9px 16px; border:0; border-radius:8px; background:var(--accent); color:#fff; font-weight:600; cursor:pointer; font-size:14px; }
     button.secondary { background:#f5f5f4; color:var(--fg); border:1px solid var(--border); }
     button.active   { background:var(--accent); color:#fff; }
     button.inactive { background:#f5f5f4; color:var(--muted); border:1px solid var(--border); }
+    button.small    { padding:4px 10px; font-size:12px; }
     .muted { color:var(--muted); font-size:13px; }
     #answer { white-space:pre-wrap; line-height:1.6; margin-top:10px; min-height:1.5em; }
     .cite {
@@ -28,6 +30,8 @@
       padding:4px 8px; margin-top:6px; border-radius:0 4px 4px 0; background:#fef9f0;
     }
     .cite strong { color:var(--fg); }
+    .cite a { color:var(--accent); text-decoration:none; font-weight:600; }
+    .cite a:hover { text-decoration:underline; }
     .related-pill {
       display:inline-block; margin:3px; padding:4px 10px;
       background:#f5f5f4; border:1px solid var(--border);
@@ -42,12 +46,63 @@
     .spinner { display:inline-block; width:14px; height:14px; border:2px solid #ccc;
       border-top-color:var(--accent); border-radius:50%; animation:spin .6s linear infinite; }
     @keyframes spin { to { transform:rotate(360deg); } }
-
-    /* Cursor blink while streaming */
     .streaming-cursor::after {
       content: "▍"; animation: blink 1s step-end infinite; color:var(--accent);
     }
     @keyframes blink { 50% { opacity:0; } }
+
+    /* Tabs */
+    .tabs { display:flex; gap:4px; margin-bottom:16px; border-bottom:2px solid var(--border); }
+    .tab { padding:8px 16px; cursor:pointer; border-radius:8px 8px 0 0; font-size:14px;
+           font-weight:600; color:var(--muted); background:transparent; border:none; }
+    .tab.active { color:var(--accent); border-bottom:2px solid var(--accent); margin-bottom:-2px; }
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; }
+
+    /* Chunk inspector */
+    #chunkList { max-height:320px; overflow-y:auto; }
+    .chunk-row { padding:8px; border-bottom:1px solid var(--border); cursor:pointer; font-size:13px; }
+    .chunk-row:hover { background:#f5f5f4; }
+    .chunk-row .chunk-meta { font-size:11px; color:var(--muted); margin-top:2px; }
+    #chunkDetail { margin-top:12px; display:none; }
+    #chunkDetail pre { background:#f5f5f4; border-radius:8px; padding:12px; font-size:12px;
+                        white-space:pre-wrap; word-break:break-word; max-height:240px; overflow-y:auto; }
+
+    /* Knowledge graph */
+    #graphCanvas { width:100%; height:420px; border:1px solid var(--border); border-radius:8px;
+                   background:#fafaf9; overflow:hidden; }
+    #graphCanvas svg { width:100%; height:100%; }
+    .node circle { stroke:#fff; stroke-width:1.5px; }
+    .node text { font-size:11px; fill:var(--fg); pointer-events:none; }
+    .link { stroke:#d6d3d1; stroke-opacity:0.6; }
+    .link-label { font-size:9px; fill:var(--muted); }
+    #graphEmpty { text-align:center; padding:48px; color:var(--muted); display:none; }
+
+    /* Gaps dashboard */
+    .gap-row { padding:10px; border-bottom:1px solid var(--border); display:flex; gap:8px; align-items:flex-start; }
+    .gap-question { flex:1; font-size:13px; }
+    .gap-reason { font-size:11px; color:var(--muted); margin-top:2px; }
+    #gapsEmpty { text-align:center; padding:32px; color:var(--muted); }
+
+    /* Entities */
+    .entity-pill {
+      display:inline-block; margin:3px; padding:3px 9px;
+      border-radius:999px; font-size:12px; font-weight:600;
+    }
+    .entity-engine  { background:#fef3c7; color:#b45309; }
+    .entity-part    { background:#dcfce7; color:#15803d; }
+    .entity-symptom { background:#dbeafe; color:#1d4ed8; }
+    .entity-cause   { background:#ede9fe; color:#7c3aed; }
+    .entity-fix     { background:#ccfbf1; color:#0f766e; }
+    .entity-spec    { background:#fee2e2; color:#b91c1c; }
+    .entity-unit    { background:#f1f5f9; color:#475569; }
+    .entity-default { background:#f5f5f4; color:var(--fg); }
+    .tag-chip {
+      display:inline-block; margin:2px; padding:2px 8px;
+      background:#f5f5f4; border:1px solid var(--border);
+      border-radius:4px; font-size:11px; color:var(--muted);
+    }
+    #entitiesEmpty { text-align:center; padding:32px; color:var(--muted); }
   </style>
 </head>
 <body>
@@ -59,37 +114,107 @@
   </header>
 
   <main>
-    <!-- Upload -->
-    <div class="card">
-      <strong>1 · Upload a document</strong>
-      <p class="muted" style="margin:4px 0 10px">PDF · scanned PDF · DOCX · DOC · XLSX · CSV · PPTX · images · .url</p>
-      <div class="row">
-        <input type="file" id="file" />
-        <button onclick="upload()">Upload &amp; Index</button>
-      </div>
-      <div id="uploadStatus" class="muted"></div>
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('ask')">Ask</button>
+      <button class="tab" onclick="switchTab('chunks')">Indexed Chunks</button>
+      <button class="tab" onclick="switchTab('graph')">Knowledge Graph</button>
+      <button class="tab" onclick="switchTab('entities')">Entities</button>
+      <button class="tab" onclick="switchTab('gaps')">Gaps</button>
     </div>
 
-    <!-- Ask -->
-    <div class="card">
-      <strong>2 · Ask a question (EN / DE)</strong>
-      <div class="row" style="margin-top:8px">
-        <input type="text" id="q"
-          placeholder="z. B. Warum überhitzt mein Hirth 3503 in der Höhe?" />
-        <button id="askBtn" onclick="ask()">Ask</button>
+    <!-- ── ASK TAB ─────────────────────────────────────────────────────── -->
+    <div id="tab-ask" class="tab-panel active">
+
+      <!-- Upload -->
+      <div class="card">
+        <strong>1 · Upload a document</strong>
+        <p class="muted" style="margin:4px 0 10px">PDF · scanned PDF · DOCX · DOC · XLSX · CSV · PPTX · images · .url</p>
+        <div class="row">
+          <input type="file" id="file" />
+          <button onclick="upload()">Upload &amp; Index</button>
+        </div>
+        <div id="uploadStatus" class="muted"></div>
       </div>
 
-      <div id="answerSection">
-        <div class="row" style="margin-top:12px; align-items:flex-start">
-          <div id="answer" style="flex:1"></div>
-          <span id="confidenceBadge" class="confidence" style="flex-shrink:0"></span>
+      <!-- Ask -->
+      <div class="card">
+        <strong>2 · Ask a question (EN / DE)</strong>
+        <div class="row" style="margin-top:8px">
+          <input type="text" id="q"
+            placeholder="z. B. Warum überhitzt mein Hirth 3503 in der Höhe?" />
+          <button id="askBtn" onclick="ask()">Ask</button>
         </div>
-        <div id="citations" style="margin-top:8px"></div>
-        <div id="related"  style="margin-top:10px"></div>
-        <div class="row" id="fb" style="margin-top:12px">
-          <button class="secondary" onclick="feedback(1)">👍 Helpful</button>
-          <button class="secondary" onclick="feedback(-1)">👎 Not right</button>
+
+        <div id="answerSection">
+          <div class="row" style="margin-top:12px; align-items:flex-start">
+            <div id="answer" style="flex:1"></div>
+            <span id="confidenceBadge" class="confidence" style="flex-shrink:0"></span>
+          </div>
+          <div id="citations" style="margin-top:8px"></div>
+          <div id="related"  style="margin-top:10px"></div>
+          <div class="row" id="fb" style="margin-top:12px">
+            <button class="secondary" onclick="feedback(1)">👍 Helpful</button>
+            <button class="secondary" onclick="feedback(-1)">👎 Not right</button>
+          </div>
         </div>
+      </div>
+    </div>
+
+    <!-- ── CHUNKS TAB ──────────────────────────────────────────────────── -->
+    <div id="tab-chunks" class="tab-panel">
+      <div class="card">
+        <strong>Indexed chunks</strong>
+        <div class="row" style="margin-top:10px; margin-bottom:10px">
+          <input type="text" id="chunkDocId" placeholder="Filter by doc_id (optional)" />
+          <button onclick="loadChunks()">Load</button>
+        </div>
+        <div id="chunkList"><span class="muted">Click Load to browse indexed chunks.</span></div>
+        <div id="chunkDetail">
+          <strong style="font-size:13px">Full chunk content</strong>
+          <pre id="chunkContent"></pre>
+          <div id="chunkMeta" class="muted" style="font-size:11px; margin-top:4px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── GRAPH TAB ───────────────────────────────────────────────────── -->
+    <div id="tab-graph" class="tab-panel">
+      <div class="card" style="padding:12px">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px">
+          <strong>Knowledge Graph</strong>
+          <button class="secondary small" onclick="loadGraph()">Refresh</button>
+        </div>
+        <div id="graphCanvas"><svg id="graphSvg"></svg></div>
+        <div id="graphEmpty">No graph nodes yet — upload documents to build the knowledge graph.</div>
+        <div id="graphLegend" style="margin-top:8px; font-size:11px; color:var(--muted)">
+          <span style="color:#b45309">●</span> engine &nbsp;
+          <span style="color:#15803d">●</span> part &nbsp;
+          <span style="color:#1d4ed8">●</span> symptom &nbsp;
+          <span style="color:#7c3aed">●</span> cause &nbsp;
+          <span style="color:#0f766e">●</span> fix
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ENTITIES TAB ────────────────────────────────────────────────── -->
+    <div id="tab-entities" class="tab-panel">
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px">
+          <strong>Extracted Entities &amp; Tags</strong>
+          <button class="secondary small" onclick="loadEntities()">Refresh</button>
+        </div>
+        <div id="entitiesContent"><span class="muted">Click Refresh to load entities extracted from ingested documents.</span></div>
+      </div>
+    </div>
+
+    <!-- ── GAPS TAB ────────────────────────────────────────────────────── -->
+    <div id="tab-gaps" class="tab-panel">
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px">
+          <strong>Knowledge Gaps</strong>
+          <button class="secondary small" onclick="loadGaps()">Refresh</button>
+        </div>
+        <div id="gapsList"><span class="muted">Click Refresh to load open gaps.</span></div>
       </div>
     </div>
   </main>
@@ -100,12 +225,27 @@
     let mode = "expert";
     let _abortCtrl = null;
 
+    // ── Tab switching ────────────────────────────────────────────────────
+    function switchTab(name) {
+      document.querySelectorAll(".tab").forEach((t, i) => {
+        const names = ["ask","chunks","graph","entities","gaps"];
+        t.classList.toggle("active", names[i] === name);
+      });
+      document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+      document.getElementById("tab-" + name).classList.add("active");
+      if (name === "graph")    loadGraph();
+      if (name === "gaps")     loadGaps();
+      if (name === "entities") loadEntities();
+    }
+
+    // ── Mode ─────────────────────────────────────────────────────────────
     function setMode(m) {
       mode = m;
       document.getElementById("btnBeginner").className = m === "beginner" ? "active" : "inactive";
       document.getElementById("btnExpert").className   = m === "expert"   ? "active" : "inactive";
     }
 
+    // ── Upload ───────────────────────────────────────────────────────────
     async function upload() {
       const f = document.getElementById("file").files[0];
       if (!f) return;
@@ -123,11 +263,11 @@
       }
     }
 
+    // ── Ask / stream ─────────────────────────────────────────────────────
     async function ask() {
       const q = document.getElementById("q").value.trim();
       if (!q) return;
 
-      // Cancel any in-flight stream
       if (_abortCtrl) _abortCtrl.abort();
       _abortCtrl = new AbortController();
 
@@ -169,7 +309,7 @@
 
           buffer += decoder.decode(value, { stream: true });
           const blocks = buffer.split("\n\n");
-          buffer = blocks.pop(); // keep incomplete trailing chunk
+          buffer = blocks.pop();
 
           for (const block of blocks) {
             if (!block.startsWith("data: ")) continue;
@@ -193,7 +333,7 @@
               answerEl.className = "";
               answerEl.textContent = "Error: " + ev.text;
             } else if (ev.type === "done") {
-              answerEl.className = "";   // remove streaming cursor
+              answerEl.className = "";
               _renderDone(ev, citesEl, badgeEl, relatedEl);
             }
           }
@@ -207,21 +347,24 @@
     }
 
     function _renderDone(ev, citesEl, badgeEl, relatedEl) {
-      // Confidence badge
       if (ev.confidence) {
         badgeEl.textContent = ev.confidence === "high" ? "✓ Grounded" : "⚠ Unverified";
         badgeEl.className   = "confidence " + (ev.confidence === "high" ? "high" : "low");
       }
 
-      // Citation cards
       const cites = (ev.citations || []).map(c => {
         const loc = c.page ? ` p.${c.page}` : "";
-        return `<div class="cite"><strong>[${c.n}]</strong> ${c.filename || c.doc_id}${loc}<br>
-                <span class="muted">${(c.snippet || "").slice(0, 120)}…</span></div>`;
+        // Evidence anchor: link to /chunks/{id} if id present
+        const anchor = c.id
+          ? `<a href="#" onclick="viewChunk(${c.id});return false">View source ↗</a>`
+          : "";
+        return `<div class="cite">
+          <strong>[${c.n}]</strong> ${c.filename || c.doc_id}${loc} ${anchor}<br>
+          <span class="muted">${(c.snippet || "").slice(0, 120)}…</span>
+        </div>`;
       }).join("");
       citesEl.innerHTML = cites;
 
-      // Related question pills
       const rel = ev.related_questions || [];
       if (rel.length) {
         relatedEl.innerHTML =
@@ -242,6 +385,200 @@
       try { await fetch("/feedback", { method: "POST", body: fd }); } catch (_) {}
       document.getElementById("fb").innerHTML =
         '<span class="muted">Thanks — feedback recorded.</span>';
+    }
+
+    // ── Chunk inspector ──────────────────────────────────────────────────
+    async function loadChunks() {
+      const docId = document.getElementById("chunkDocId").value.trim();
+      const url = docId ? `/chunks?doc_id=${encodeURIComponent(docId)}&limit=100` : "/chunks?limit=100";
+      const el = document.getElementById("chunkList");
+      el.innerHTML = '<span class="spinner"></span>';
+      try {
+        const r = await fetch(url);
+        const j = await r.json();
+        if (!j.chunks || !j.chunks.length) {
+          el.innerHTML = '<span class="muted">No chunks found.</span>';
+          return;
+        }
+        el.innerHTML = j.chunks.map(c => `
+          <div class="chunk-row" onclick="viewChunk(${c.id})">
+            <strong>[${c.id}]</strong> <span style="color:var(--accent)">${c.doc_id}</span>
+            — ${c.snippet}…
+            <div class="chunk-meta">type: ${c.metadata.chunk_type || c.metadata.type || "?"} · lang: ${c.metadata.lang || "?"}</div>
+          </div>`).join("");
+      } catch (e) {
+        el.innerHTML = `<span class="muted">Error: ${e.message}</span>`;
+      }
+    }
+
+    async function viewChunk(id) {
+      // Switch to chunks tab
+      switchTab("chunks");
+      document.getElementById("chunkDetail").style.display = "block";
+      document.getElementById("chunkContent").textContent = "Loading…";
+      try {
+        const r = await fetch(`/chunks/${id}`);
+        const j = await r.json();
+        if (j.error) { document.getElementById("chunkContent").textContent = j.error; return; }
+        document.getElementById("chunkContent").textContent = j.content;
+        const refs = (j.source_refs || []).map(r => r.filename || r.source || JSON.stringify(r)).join(", ");
+        document.getElementById("chunkMeta").textContent =
+          `id:${j.id} · doc_id:${j.doc_id} · type:${j.metadata.chunk_type || "?"} · sources: ${refs || "none"}`;
+      } catch (e) {
+        document.getElementById("chunkContent").textContent = "Error: " + e.message;
+      }
+    }
+
+    // ── Knowledge graph ──────────────────────────────────────────────────
+    const NODE_COLOR = {
+      engine:"#b45309", part:"#15803d", symptom:"#1d4ed8", cause:"#7c3aed", fix:"#0f766e"
+    };
+
+    async function loadGraph() {
+      const svg = d3.select("#graphSvg");
+      svg.selectAll("*").remove();
+
+      let data;
+      try {
+        const r = await fetch("/graph");
+        data = await r.json();
+      } catch (e) {
+        document.getElementById("graphEmpty").style.display = "block";
+        return;
+      }
+
+      if (!data.nodes || !data.nodes.length) {
+        document.getElementById("graphEmpty").style.display = "block";
+        document.getElementById("graphCanvas").style.display = "none";
+        return;
+      }
+      document.getElementById("graphEmpty").style.display = "none";
+      document.getElementById("graphCanvas").style.display = "block";
+
+      const W = document.getElementById("graphCanvas").clientWidth || 800;
+      const H = 420;
+      svg.attr("viewBox", `0 0 ${W} ${H}`);
+
+      const simulation = d3.forceSimulation(data.nodes)
+        .force("link", d3.forceLink(data.edges)
+          .id(d => d.id).distance(90))
+        .force("charge", d3.forceManyBody().strength(-180))
+        .force("center", d3.forceCenter(W / 2, H / 2))
+        .force("collision", d3.forceCollide(28));
+
+      const link = svg.append("g").selectAll("line")
+        .data(data.edges).join("line")
+        .attr("class", "link").attr("stroke-width", 1.5);
+
+      const linkLabel = svg.append("g").selectAll("text")
+        .data(data.edges).join("text")
+        .attr("class", "link-label")
+        .text(d => d.relation);
+
+      const node = svg.append("g").selectAll("g")
+        .data(data.nodes).join("g")
+        .attr("class", "node")
+        .call(d3.drag()
+          .on("start", (event, d) => { if (!event.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+          .on("drag",  (event, d) => { d.fx = event.x; d.fy = event.y; })
+          .on("end",   (event, d) => { if (!event.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }));
+
+      node.append("circle")
+        .attr("r", 14)
+        .attr("fill", d => NODE_COLOR[d.type] || "#78716c");
+
+      node.append("text")
+        .attr("dy", 24).attr("text-anchor", "middle")
+        .text(d => d.name.length > 16 ? d.name.slice(0, 14) + "…" : d.name);
+
+      node.append("title").text(d => `[${d.type}] ${d.name}`);
+
+      simulation.on("tick", () => {
+        link
+          .attr("x1", d => d.source.x).attr("y1", d => d.source.y)
+          .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+        linkLabel
+          .attr("x", d => (d.source.x + d.target.x) / 2)
+          .attr("y", d => (d.source.y + d.target.y) / 2);
+        node.attr("transform", d => `translate(${d.x},${d.y})`);
+      });
+    }
+
+    // ── Entities ─────────────────────────────────────────────────────────
+    const ENTITY_CLASS = {
+      engine:"entity-engine", part:"entity-part", symptom:"entity-symptom",
+      cause:"entity-cause", fix:"entity-fix", spec:"entity-spec", unit:"entity-unit"
+    };
+
+    async function loadEntities() {
+      const el = document.getElementById("entitiesContent");
+      el.innerHTML = '<span class="spinner"></span>';
+      try {
+        const r = await fetch("/entities");
+        const j = await r.json();
+
+        if ((!j.entities || !j.entities.length) && (!j.tags || !j.tags.length)) {
+          el.innerHTML = '<div id="entitiesEmpty">No entities yet — upload and index documents to extract engine knowledge.</div>';
+          return;
+        }
+
+        let html = "";
+
+        if (j.entities && j.entities.length) {
+          html += '<div style="margin-bottom:12px"><strong style="font-size:13px">Entities</strong> <span class="muted">(type · name · count)</span><div style="margin-top:8px">';
+          html += j.entities.map(e => {
+            const cls = ENTITY_CLASS[e.type] || "entity-default";
+            return `<span class="entity-pill ${cls}" title="${e.type}">${e.name} <span style="opacity:0.6">×${e.count}</span></span>`;
+          }).join("");
+          html += "</div></div>";
+        }
+
+        if (j.tags && j.tags.length) {
+          html += '<div><strong style="font-size:13px">Tags</strong><div style="margin-top:8px">';
+          html += j.tags.map(t =>
+            `<span class="tag-chip">${t.tag} <span style="opacity:0.6">×${t.count}</span></span>`
+          ).join("");
+          html += "</div></div>";
+        }
+
+        el.innerHTML = html;
+      } catch (e) {
+        el.innerHTML = `<span class="muted">Error: ${e.message}</span>`;
+      }
+    }
+
+    // ── Gaps dashboard ───────────────────────────────────────────────────
+    async function loadGaps() {
+      const el = document.getElementById("gapsList");
+      el.innerHTML = '<span class="spinner"></span>';
+      try {
+        const r = await fetch("/gaps");
+        const j = await r.json();
+        if (!j.gaps || !j.gaps.length) {
+          el.innerHTML = '<div id="gapsEmpty">No open gaps. 🎉</div>';
+          return;
+        }
+        el.innerHTML = j.gaps.map(g => `
+          <div class="gap-row" id="gap-${g.id}">
+            <div class="gap-question">
+              <strong>Q:</strong> ${g.question}
+              <div class="gap-reason">${g.reason} · ${new Date(g.created_at).toLocaleDateString()}</div>
+            </div>
+            <button class="small secondary" onclick="resolveGap(${g.id})">Resolve</button>
+          </div>`).join("");
+      } catch (e) {
+        el.innerHTML = `<span class="muted">Error: ${e.message}</span>`;
+      }
+    }
+
+    async function resolveGap(id) {
+      try {
+        await fetch(`/gaps/${id}/resolve`, { method: "POST" });
+        const row = document.getElementById("gap-" + id);
+        if (row) { row.style.opacity = "0.4"; row.querySelector("button").disabled = true; }
+      } catch (e) {
+        alert("Failed to resolve gap: " + e.message);
+      }
     }
   </script>
 </body>

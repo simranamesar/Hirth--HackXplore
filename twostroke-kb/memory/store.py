@@ -116,3 +116,36 @@ def record_feedback(
             )
     finally:
         conn.close()
+
+    # Promote non-empty corrections into the knowledge base as high-priority chunks
+    if correction and correction.strip():
+        _promote_correction(question, correction.strip(), session_id)
+
+
+def _promote_correction(question: str, correction: str, session_id: str) -> None:
+    """Embed a user correction and store it as a high-priority chunk.
+
+    The chunk content is phrased as Q→A so the retriever can surface it when
+    the same question (or a semantically similar one) is asked again.
+    Silently swallows all errors so a failure never breaks the feedback path.
+    """
+    try:
+        from ingestion.knowledge_base import embed, store
+
+        content = f"Q: {question}\nA (correction): {correction}"
+        chunk = {
+            "content": content,
+            "metadata": {
+                "filename": f"correction:{session_id}",
+                "lang": "unknown",
+                "type": "correction",
+                "chunk_type": "prose",
+                "source": "user_feedback",
+            },
+            "source_refs": [{"source": "user_feedback", "session_id": session_id}],
+        }
+        chunks = embed([chunk])
+        store(chunks)
+        log.info("store: promoted correction from session %s into knowledge base", session_id)
+    except Exception:
+        log.warning("store: failed to promote correction from session %s", session_id)

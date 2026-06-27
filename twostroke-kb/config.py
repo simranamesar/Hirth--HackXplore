@@ -12,13 +12,13 @@ class Settings(BaseSettings):
     # database
     database_url: str = "postgresql://postgres:postgres@localhost:5432/twostroke"
 
-    # llm
-    llm_provider: str = "openai"            # openai | anthropic | ollama
-    llm_model: str = "gpt-4o-mini"
+    # llm — "local" uses an OpenAI-compatible endpoint (Ollama /v1, vLLM, LM Studio, etc.)
+    llm_provider: str = "local"             # local | openai | anthropic
+    llm_base_url: str = "http://localhost:11434/v1"
+    llm_api_key: str = "local"
+    llm_model: str = "qwen3:8b"
     openai_api_key: str = ""
     anthropic_api_key: str = ""
-    ollama_base_url: str = "http://localhost:11434"
-    ollama_model: str = "llama3.1"
 
     # embeddings / rerank
     embedding_model: str = "intfloat/multilingual-e5-small"
@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     ocr_langs: str = "deu+eng"
     upload_dir: str = "./data/uploads"
     enable_figure_handler: bool = False
+    llm_vision_model: str = "llama3.2:3b"  # model used by describe_image(); pulled separately
 
     # app
     app_host: str = "0.0.0.0"
