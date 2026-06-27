@@ -3,7 +3,17 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>TwoStrokeGPT</title>
+  <title>TorqBase</title>
+  <script>
+    (() => {
+      try {
+        const saved = localStorage.getItem("twostroke-theme") || "dark";
+        document.documentElement.dataset.theme = saved === "light" ? "light" : "dark";
+      } catch (_) {
+        document.documentElement.dataset.theme = "dark";
+      }
+    })();
+  </script>
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin=""/>
@@ -15,7 +25,27 @@
       --line:#222c36;--line2:#30404e;
       --tx:#e8edf3;--tx2:#9aa7b5;--tx3:#66727e;
       --grn:#56a6ff;--grn-glow:#56a6ff26;--amb:#f0a830;--red:#e5484d;--blu:#56a6ff;
+      --accent-ink:#06172e;--soft-fill:#ffffff08;--soft-fill-2:#ffffff0a;
+      --button-bg:var(--panel2);--button-text:var(--tx2);--input-bg:var(--panel);--input-text:var(--tx);
+      --graph-bg:var(--ins);--node-stroke:var(--bg);--label-stroke:var(--ins);
+      --edge-color:var(--line2);--edge-label-bg:var(--panel);--edge-label-text:var(--tx);
+      --edge-important:#56a6ff66;--edge-path-fill:#f0a83018;--edge-highlight:var(--amb);
+      --path-node:#c58cff;--path-badge-bg:var(--amb);--path-badge-text:#101418;--path-badge-shadow:#0009;
+      --drawer-bg:var(--ins);--tooltip-bg:var(--panel);--tooltip-text:var(--tx2);--shadow:0 12px 32px #0008;
       --mono:'IBM Plex Mono',monospace;
+    }
+    :root[data-theme="light"]{
+      --bg:#f3f6f8;--bg2:#eaf0f4;--panel:#ffffff;--panel2:#f7fafc;--ins:#edf3f7;
+      --line:#d7e1e8;--line2:#b8c8d4;
+      --tx:#14202b;--tx2:#435568;--tx3:#718191;
+      --grn:#2563eb;--grn-glow:#2563eb1c;--amb:#b45309;--red:#c2410c;--blu:#2563eb;
+      --accent-ink:#ffffff;--soft-fill:#0f172a08;--soft-fill-2:#0f172a0d;
+      --button-bg:#ffffff;--button-text:#34465a;--input-bg:#ffffff;--input-text:#14202b;
+      --graph-bg:#f8fbfd;--node-stroke:#ffffff;--label-stroke:#f8fbfd;
+      --edge-color:#9cafbd;--edge-label-bg:#ffffff;--edge-label-text:#1d2b38;
+      --edge-important:#2563eb66;--edge-path-fill:#b453091a;--edge-highlight:#b45309;
+      --path-node:#7c3aed;--path-badge-bg:#b45309;--path-badge-text:#ffffff;--path-badge-shadow:#1e293b55;
+      --drawer-bg:#ffffff;--tooltip-bg:#ffffff;--tooltip-text:#435568;--shadow:0 14px 32px #1e293b24;
     }
     html,body{height:100%;margin:0;background:var(--bg);color:var(--tx);font-family:'IBM Plex Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
     h1,h2,h3,p,ul{margin:0}
@@ -32,7 +62,7 @@
     .rail{width:236px;flex:none;background:var(--bg2);border-right:1px solid var(--line);display:flex;flex-direction:column}
     .brandbox{padding:18px 18px 16px;border-bottom:1px solid var(--line)}
     .brand{display:flex;align-items:center;gap:11px}
-    .bmark{width:34px;height:34px;border-radius:8px;background:var(--grn);display:flex;align-items:center;justify-content:center;color:#06172e;font-family:var(--mono);font-weight:600;font-size:14px;box-shadow:0 0 0 1px #ffffff14,0 6px 16px var(--grn-glow)}
+    .bmark{width:34px;height:34px;border-radius:8px;background:var(--grn);display:flex;align-items:center;justify-content:center;color:var(--accent-ink);font-family:var(--mono);font-weight:600;font-size:14px;box-shadow:0 0 0 1px #ffffff14,0 6px 16px var(--grn-glow)}
     .bname{font-family:'Saira';font-weight:700;font-size:16px;letter-spacing:.01em;line-height:1.05}
     .bsub{font-family:var(--mono);font-size:9.5px;color:var(--tx3);letter-spacing:.12em;text-transform:uppercase;margin-top:3px}
     .navsec{padding:16px 18px 7px;font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--tx3)}
@@ -43,7 +73,7 @@
     .nidx{font-family:var(--mono);font-size:11px;color:var(--tx3);width:16px}
     .navi.on .nidx{color:var(--grn)}
     .nlbl{font-size:14px;font-weight:500;flex:1}
-    .nbadge{font-family:var(--mono);font-size:10px;color:var(--tx3);background:#ffffff0a;padding:2px 6px;border-radius:5px}
+    .nbadge{font-family:var(--mono);font-size:10px;color:var(--tx3);background:var(--soft-fill-2);padding:2px 6px;border-radius:5px}
     .navi.on .nbadge{color:var(--grn);background:#56a6ff1f}
     .railftr{border-top:1px solid var(--line);padding:14px 16px;display:flex;flex-direction:column;gap:4px}
     .kbstat{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--tx2)}
@@ -59,6 +89,8 @@
     .segb{font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--tx2);padding:5px 10px;border-radius:6px;cursor:pointer;border:none;background:transparent;text-transform:uppercase;transition:.1s}
     .segb.on{background:var(--panel2);color:var(--tx);box-shadow:inset 0 0 0 1px var(--line2)}
     .segb.on.acc{color:var(--grn)}
+    .theme-toggle{height:32px;border-radius:8px;border:1px solid var(--line2);background:var(--button-bg);color:var(--button-text);font-family:var(--mono);font-size:11px;letter-spacing:.04em;text-transform:uppercase;padding:0 11px;cursor:pointer;transition:.12s}
+    .theme-toggle:hover{color:var(--tx);border-color:var(--grn);box-shadow:0 0 0 3px var(--grn-glow)}
     .upload-pill{display:none}
     #uploadStatus{display:none}
 
@@ -79,7 +111,7 @@
     .who{display:flex;align-items:center;gap:8px;margin-bottom:7px}
     .ava{width:22px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:9px;font-weight:600;flex:none}
     .ava.u{background:var(--panel2);color:var(--tx2);border:1px solid var(--line2)}
-    .ava.a{background:var(--grn);color:#06172e}
+    .ava.a{background:var(--grn);color:var(--accent-ink)}
     .whoname{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--tx3)}
     .ubub{align-self:flex-end;max-width:76%;background:var(--panel2);border:1px solid var(--line2);border-radius:13px 13px 4px 13px;padding:13px 16px;font-size:14.5px;line-height:1.5;white-space:pre-wrap}
     .arow{align-self:stretch}
@@ -90,12 +122,12 @@
     .grounded-badge.warn{color:var(--amb)}
     .grounded-badge .dot{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor}
     .fbrow{display:flex;gap:7px;align-items:center}
-    .vbtn{height:30px;min-width:34px;padding:0 9px;border-radius:7px;border:1px solid var(--line2);background:var(--panel2);color:var(--tx2);cursor:pointer;font-size:12px;font-family:var(--mono);transition:.1s}
+    .vbtn{height:30px;min-width:34px;padding:0 9px;border-radius:7px;border:1px solid var(--line2);background:var(--button-bg);color:var(--button-text);cursor:pointer;font-size:12px;font-family:var(--mono);transition:.1s}
     .vbtn:hover{color:var(--tx)}
     .vbtn.up.on{color:var(--grn);border-color:#56a6ff55;background:#56a6ff14}
     .vbtn.dn.on{color:var(--red);border-color:#e5484d55;background:#e5484d14}
     .related-wrap{margin-top:12px;display:flex;flex-wrap:wrap;gap:6px}
-    .rel-chip{font-family:var(--mono);font-size:11px;color:var(--tx2);background:#ffffff08;border:1px solid var(--line);padding:5px 9px;border-radius:6px;cursor:pointer;white-space:nowrap}
+    .rel-chip{font-family:var(--mono);font-size:11px;color:var(--tx2);background:var(--soft-fill);border:1px solid var(--line);padding:5px 9px;border-radius:6px;cursor:pointer;white-space:nowrap}
     .rel-chip:hover{border-color:var(--grn);color:var(--grn)}
     .inline-evidence{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
     .inline-evidence-hdr{font-family:var(--mono);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--tx3);margin-bottom:8px}
@@ -114,7 +146,7 @@
     .composer-inner:focus-within{border-color:#56a6ff55}
     .composer-ta{flex:1;background:transparent;border:none;outline:none;color:var(--tx);font-family:'IBM Plex Sans';font-size:14px;line-height:1.5;resize:none;max-height:140px;min-height:22px}
     .composer-ta::placeholder{color:var(--tx3)}
-    .send-btn{flex:none;width:36px;height:36px;border-radius:9px;background:var(--grn);border:none;cursor:pointer;color:#06172e;display:flex;align-items:center;justify-content:center;font-size:16px;transition:.15s}
+    .send-btn{flex:none;width:36px;height:36px;border-radius:9px;background:var(--grn);border:none;cursor:pointer;color:var(--accent-ink);display:flex;align-items:center;justify-content:center;font-size:16px;transition:.15s}
     .send-btn:hover{filter:brightness(1.1)}
     .send-btn:disabled{opacity:.4;cursor:not-allowed}
     .spinner{display:inline-block;width:13px;height:13px;border:2px solid #56a6ff55;border-top-color:var(--grn);border-radius:50%;animation:spin .6s linear infinite}
@@ -136,7 +168,7 @@
     .fmt-pdf{color:#ff9483;background:#e5484d1c;border:1px solid #e5484d33}
     .fmt-xlsx,.fmt-csv{color:var(--grn);background:#56a6ff16;border:1px solid #56a6ff33}
     .fmt-docx,.fmt-doc{color:var(--amb);background:#f0a83016;border:1px solid #f0a83033}
-    .fmt-default{color:var(--tx2);background:#ffffff0a;border:1px solid var(--line2)}
+    .fmt-default{color:var(--tx2);background:var(--soft-fill-2);border:1px solid var(--line2)}
     .srccard-name{font-family:var(--mono);font-size:11px;color:var(--tx2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .srccard-page{font-family:var(--mono);font-size:10px;color:var(--tx3)}
     .srccard-snippet{font-size:11.5px;color:var(--tx3);line-height:1.45;margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
@@ -146,9 +178,9 @@
     /* ── Shared card ── */
     .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}
     .sect{font-family:'Saira';font-weight:600;font-size:15px;margin-bottom:12px;display:flex;align-items:center;gap:10px;color:var(--tx)}
-    .btn{font-family:'IBM Plex Sans';font-size:13px;font-weight:600;padding:8px 14px;border-radius:8px;border:1px solid var(--line2);background:var(--panel2);color:var(--tx);cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:.1s}
+    .btn{font-family:'IBM Plex Sans';font-size:13px;font-weight:600;padding:8px 14px;border-radius:8px;border:1px solid var(--line2);background:var(--button-bg);color:var(--tx);cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:.1s}
     .btn:hover{border-color:#56a6ff55;color:var(--grn)}
-    .btn.pri{background:var(--grn);color:#06172e;border-color:var(--grn)}
+    .btn.pri{background:var(--grn);color:var(--accent-ink);border-color:var(--grn)}
     .btn.pri:hover{filter:brightness(1.07)}
     .btn.sm{padding:5px 10px;font-size:12px}
     .muted{color:var(--tx3);font-size:13px}
@@ -186,7 +218,7 @@
     .diag-node.symptom{background:#f0a83014;color:var(--amb);border:1px solid #f0a83033}
     .diag-node.cause{background:#e5484d14;color:#ff9483;border:1px solid #e5484d33}
     .diag-node.fix{background:#56a6ff14;color:var(--grn);border:1px solid #56a6ff33}
-    .diag-node.part{background:#ffffff08;color:var(--tx2);border:1px solid var(--line2)}
+    .diag-node.part{background:var(--soft-fill);color:var(--tx2);border:1px solid var(--line2)}
     .diag-meta{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-family:var(--mono);font-size:10.5px;color:var(--tx3)}
     .diag-conf{display:flex;align-items:center;gap:6px}
     .diag-bar{width:60px;height:4px;background:var(--ins);border-radius:2px;overflow:hidden}
@@ -225,31 +257,72 @@
     .graph-tools{display:flex;flex-direction:column;gap:12px;margin-bottom:14px}
     .graph-toolrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
     .graph-toolrow input[type=text]{min-width:220px;flex:1}
-    .graph-select{background:var(--panel);border:1px solid var(--line2);border-radius:8px;color:var(--tx);font-size:12px;font-family:var(--mono);padding:7px 9px;outline:none}
+    .graph-select{background:var(--input-bg);border:1px solid var(--line2);border-radius:8px;color:var(--input-text);font-size:12px;font-family:var(--mono);padding:7px 9px;outline:none}
+    .graph-modebar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:var(--ins)}
+    .graph-modebar .lbl{margin-right:2px}
+    .graph-modehint{font-family:var(--mono);font-size:11px;color:var(--tx3);line-height:1.35}
+    .graph-modehint b{color:var(--tx);font-weight:600}
+    .graph-modehint.warn{color:var(--amb)}
+    .graph-demo-tip{margin:-2px 0 12px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--soft-fill);color:var(--tx2);font-family:var(--mono);font-size:11px;line-height:1.4}
+    .graph-summary{display:grid;grid-template-columns:repeat(6,minmax(86px,1fr));gap:8px;margin:0 0 12px}
+    .graph-stat{border:1px solid var(--line);border-radius:8px;background:var(--ins);padding:8px 10px;min-width:0}
+    .graph-stat .n{font-family:'Saira';font-weight:700;font-size:18px;color:var(--tx);line-height:1}
+    .graph-stat .l{font-family:var(--mono);font-size:9.5px;color:var(--tx3);letter-spacing:.07em;text-transform:uppercase;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .graph-filtergroup{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-    .filter-chip{font-family:var(--mono);font-size:10.5px;color:var(--tx2);background:#ffffff08;border:1px solid var(--line);border-radius:999px;padding:5px 8px;cursor:pointer;user-select:none;transition:.1s}
+    .graph-view-controls{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:0 0 8px}
+    .graph-view-controls .btn{height:30px;padding:5px 10px;font-size:11.5px}
+    .graph-hint{font-family:var(--mono);font-size:10.5px;color:var(--tx3);margin-left:auto}
+    .graph-focusbar{display:none;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 10px;padding:8px 10px;border:1px solid #56a6ff33;border-radius:8px;background:#56a6ff10;color:var(--tx2);font-family:var(--mono);font-size:11px}
+    .graph-focusbar.on{display:flex}
+    .graph-focusbar b{color:var(--tx);font-weight:600}
+    .graph-focusbar .btn{height:28px;padding:4px 9px;font-size:11px}
+    .graph-focuspath{display:flex;gap:5px;align-items:center;flex-wrap:wrap;min-width:100%;margin-top:2px;color:var(--tx3)}
+    .graph-focuspath button{font-family:var(--mono);font-size:10.5px;color:var(--grn);background:var(--soft-fill);border:1px solid var(--line);border-radius:999px;padding:3px 7px;cursor:pointer}
+    .graph-focuspath button:hover{border-color:#56a6ff55;background:#56a6ff12}
+    .filter-chip{font-family:var(--mono);font-size:10.5px;color:var(--tx2);background:var(--soft-fill);border:1px solid var(--line);border-radius:999px;padding:5px 8px;cursor:pointer;user-select:none;transition:.1s}
     .filter-chip:hover{border-color:var(--line2);color:var(--tx)}
     .filter-chip.on{color:var(--grn);border-color:#56a6ff44;background:#56a6ff12}
     .toggle-chip{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px;color:var(--tx2);background:var(--ins);border:1px solid var(--line);border-radius:7px;padding:6px 8px;cursor:pointer;user-select:none}
     .toggle-chip input{accent-color:var(--grn)}
     .graph-layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:12px;align-items:stretch}
-    #graphCanvas{width:100%;height:460px;border:1px solid var(--line);border-radius:10px;background:var(--ins);overflow:hidden}
-    #graphCanvas svg{width:100%;height:100%}
-    .node circle{stroke:var(--bg);stroke-width:1.5px}
+    #graphCanvas{width:100%;height:clamp(460px,62vh,760px);min-height:360px;max-height:82vh;border:1px solid var(--line);border-radius:10px;background:var(--graph-bg);overflow:hidden;resize:vertical;user-select:none;touch-action:none;position:relative}
+    #graphCanvas::after{content:"";position:absolute;right:5px;bottom:5px;width:14px;height:14px;border-right:2px solid var(--line2);border-bottom:2px solid var(--line2);opacity:.8;pointer-events:none}
+    #graphCanvas svg{width:100%;height:100%;display:block;cursor:grab}
+    #graphCanvas svg:active{cursor:grabbing}
+    .node circle{stroke:var(--node-stroke);stroke-width:1.5px}
     .node.selected circle{stroke:var(--grn);stroke-width:3px}
+    .node.focused circle{stroke:var(--amb);stroke-width:4px;filter:drop-shadow(0 0 8px #f0a83066)}
+    .node.neighbor circle{stroke:var(--line2);stroke-width:2px}
+    .node.path circle{stroke:var(--path-node);stroke-width:3px}
     .node.match circle{stroke:var(--amb);stroke-width:3px}
-    .node text{font-size:10.5px;fill:var(--tx2);pointer-events:none;font-family:var(--mono)}
-    .node-type-label{font-size:8px;fill:var(--bg);font-family:var(--mono);font-weight:700;pointer-events:none;text-transform:uppercase}
-    .link{stroke:var(--line2);stroke-opacity:0.7;cursor:pointer}
+    .path-step-badge{pointer-events:none}
+    .path-step-badge circle{fill:var(--path-badge-bg);stroke:var(--node-stroke);stroke-width:2px;filter:drop-shadow(0 1px 4px var(--path-badge-shadow))}
+    .path-step-badge text{fill:var(--path-badge-text);font-family:var(--mono);font-size:10px;font-weight:700;stroke:none}
+    .node text{font-size:11px;fill:var(--tx2);pointer-events:none;font-family:var(--mono)}
+    .node-label{paint-order:stroke;stroke:var(--label-stroke);stroke-width:3px;stroke-linejoin:round}
+    .node-type-label{font-size:8px;fill:var(--accent-ink);font-family:var(--mono);font-weight:700;pointer-events:none;text-transform:uppercase}
+    .link{stroke:var(--edge-color);stroke-opacity:0.7;cursor:pointer}
     .link.selected{stroke:var(--grn);stroke-opacity:1}
-    .link-label{font-size:9px;fill:var(--tx3);font-family:var(--mono);cursor:pointer}
+    .link.path-edge{stroke:var(--edge-highlight);stroke-opacity:1}
+    .edge-label{cursor:pointer;pointer-events:auto}
+    .edge-label rect{fill:var(--edge-label-bg);stroke:var(--line2);stroke-width:1px;opacity:.94}
+    .edge-label text{font-size:10px;fill:var(--edge-label-text);font-family:var(--mono);font-weight:600;pointer-events:none}
+    .edge-label.important rect,.edge-label.selected rect{stroke:var(--edge-important);background:var(--panel2)}
+    .edge-label.path rect{stroke:var(--edge-highlight);fill:var(--edge-path-fill)}
+    .edge-tip{position:fixed;z-index:2000;max-width:320px;padding:9px 11px;border-radius:8px;border:1px solid var(--line2);background:var(--tooltip-bg);box-shadow:var(--shadow);color:var(--tooltip-text);font-size:12px;line-height:1.4;pointer-events:none;display:none}
+    .edge-tip b{color:var(--tx)}
+    .relation-legend{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:8px 0 10px;color:var(--tx3);font-family:var(--mono);font-size:10.5px}
+    .relation-legend span{border:1px solid var(--line);border-radius:999px;background:var(--soft-fill);padding:4px 7px}
+    .relation-legend b{color:var(--tx);font-weight:600}
+    .edge-label-note{display:none;margin:0 0 8px;color:var(--amb);font-family:var(--mono);font-size:10.5px}
+    .edge-label-note.on{display:block}
     #graphEmpty{text-align:center;padding:60px;color:var(--tx3);font-family:var(--mono);font-size:12px;letter-spacing:.07em;text-transform:uppercase}
-    .graph-inspector{min-height:460px;border:1px solid var(--line);border-radius:10px;background:var(--ins);padding:14px;overflow:auto}
+    .graph-inspector{min-height:460px;border:1px solid var(--line);border-radius:10px;background:var(--drawer-bg);padding:14px;overflow:auto}
     .graph-inspector-empty{height:100%;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--tx3);font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;line-height:1.5}
     .inspector-title{font-family:'Saira';font-weight:600;font-size:17px;line-height:1.2;margin-bottom:8px}
     .inspector-sub{font-family:var(--mono);font-size:11px;color:var(--tx3);margin-bottom:12px}
     .badge-row{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 12px}
-    .kg-badge{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;padding:3px 7px;border-radius:999px;border:1px solid var(--line2);background:#ffffff08;color:var(--tx2);text-transform:uppercase}
+    .kg-badge{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;padding:3px 7px;border-radius:999px;border:1px solid var(--line2);background:var(--soft-fill);color:var(--tx2);text-transform:uppercase}
     .kg-badge.good{color:var(--grn);border-color:#56a6ff33;background:#56a6ff10}
     .kg-badge.warn{color:var(--amb);border-color:#f0a83033;background:#f0a83010}
     .kg-badge.bad{color:#ff9483;border-color:#e5484d33;background:#e5484d10}
@@ -258,21 +331,21 @@
     .kg-kv .v{color:var(--tx2);word-break:break-word}
     .evidence-box{margin-top:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:10px;color:var(--tx2);font-size:12px;line-height:1.45;white-space:pre-wrap}
     .connected-list{display:flex;flex-direction:column;gap:6px;margin-top:10px}
-    .connected-item{border:1px solid var(--line);border-radius:7px;background:#ffffff05;padding:7px 8px;font-size:12px;color:var(--tx2)}
+    .connected-item{border:1px solid var(--line);border-radius:7px;background:var(--soft-fill);padding:7px 8px;font-size:12px;color:var(--tx2)}
     .connected-item b{color:var(--tx);font-weight:600}
-    @media (max-width:980px){.graph-layout{grid-template-columns:1fr}.graph-inspector{min-height:220px}}
+    @media (max-width:980px){.graph-layout{grid-template-columns:1fr}.graph-inspector{min-height:220px}.graph-summary{grid-template-columns:repeat(2,1fr)}}
 
     /* ── Entities ── */
     .entity-pill{display:inline-block;margin:3px;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600;font-family:var(--mono)}
     .entity-engine{background:#56a6ff14;color:var(--grn);border:1px solid #56a6ff33}
-    .entity-part{background:#ffffff08;color:var(--tx2);border:1px solid var(--line2)}
+    .entity-part{background:var(--soft-fill);color:var(--tx2);border:1px solid var(--line2)}
     .entity-symptom{background:#56a6ff14;color:var(--blu);border:1px solid #56a6ff33}
     .entity-cause{background:#f0a83014;color:var(--amb);border:1px solid #f0a83033}
     .entity-fix{background:#56a6ff0a;color:#7ee8a2;border:1px solid #56a6ff22}
     .entity-spec{background:#e5484d14;color:#ff9483;border:1px solid #e5484d33}
-    .entity-unit{background:#ffffff08;color:var(--tx3);border:1px solid var(--line)}
-    .entity-default{background:#ffffff08;color:var(--tx2);border:1px solid var(--line)}
-    .tag-chip{display:inline-block;margin:2px;padding:2px 8px;background:#ffffff08;border:1px solid var(--line);border-radius:4px;font-size:11px;color:var(--tx3);font-family:var(--mono)}
+    .entity-unit{background:var(--soft-fill);color:var(--tx3);border:1px solid var(--line)}
+    .entity-default{background:var(--soft-fill);color:var(--tx2);border:1px solid var(--line)}
+    .tag-chip{display:inline-block;margin:2px;padding:2px 8px;background:var(--soft-fill);border:1px solid var(--line);border-radius:4px;font-size:11px;color:var(--tx3);font-family:var(--mono)}
 
     /* ── Gaps ── */
     .gap-row{padding:12px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:flex-start}
@@ -283,7 +356,7 @@
     .pad{padding:20px;overflow:auto;flex:1}
 
     /* ── Input ── */
-    input[type=text]{background:var(--panel);border:1px solid var(--line2);border-radius:8px;padding:8px 12px;color:var(--tx);font-size:13px;outline:none;font-family:'IBM Plex Sans'}
+    input[type=text]{background:var(--input-bg);border:1px solid var(--line2);border-radius:8px;padding:8px 12px;color:var(--input-text);font-size:13px;outline:none;font-family:'IBM Plex Sans'}
     input[type=text]::placeholder{color:var(--tx3)}
     input[type=text]:focus{border-color:#56a6ff55}
   </style>
@@ -297,7 +370,7 @@
       <div class="brand">
         <div class="bmark">TS</div>
         <div>
-          <div class="bname">TwoStrokeGPT</div>
+          <div class="bname">TorqBase</div>
           <div class="bsub">Engine Intelligence</div>
         </div>
       </div>
@@ -350,7 +423,9 @@
         <span class="page-t" id="pageTitle">Ask</span>
         <div id="uploadStatus"></div>
       </div>
-      <div class="tb-r"></div>
+      <div class="tb-r">
+        <button class="theme-toggle" type="button" data-theme-toggle onclick="toggleTheme()" aria-label="Switch theme" title="Switch theme">Light</button>
+      </div>
     </div>
 
     <!-- Content -->
@@ -483,7 +558,20 @@
               Knowledge Graph
               <button class="btn sm" style="margin-left:auto" onclick="loadGraph()">Refresh</button>
             </div>
+            <div class="graph-demo-tip">
+              Tip: Click a node to focus its neighborhood. Click neighbors to deep-dive. Numbered badges show your selected path.
+            </div>
             <div class="graph-tools">
+              <div class="graph-modebar">
+                <span class="lbl">Mode</span>
+                <select id="graphMode" class="graph-select" onchange="setGraphMode(this.value)">
+                  <option value="overview" selected>Overview</option>
+                  <option value="full">Full Graph</option>
+                  <option value="focus">Focus</option>
+                  <option value="diagnostic">Diagnostic</option>
+                </select>
+                <span id="graphModeHint" class="graph-modehint">Overview: High-level engine systems and diagnostic concepts</span>
+              </div>
               <div class="graph-toolrow">
                 <input type="text" id="graphSearch" placeholder="Search spark plug, misfire, overheating, carburetor" oninput="applyGraphFilters()"/>
                 <select id="graphMinConfidence" class="graph-select" onchange="loadGraph()">
@@ -495,15 +583,52 @@
                 <label class="toggle-chip"><input id="graphShowSeed" type="checkbox" checked onchange="loadGraph()"/> seed ontology</label>
                 <label class="toggle-chip"><input id="graphShowDocFacts" type="checkbox" checked onchange="applyGraphFilters()"/> document facts</label>
                 <label class="toggle-chip"><input id="graphShowWeak" type="checkbox" onchange="loadGraph()"/> weak edges</label>
+                <label class="toggle-chip"><input id="graphShowEdgeLabels" type="checkbox" onchange="markGraphEdgeLabelPreference();applyGraphFilters()"/> edge labels</label>
               </div>
               <div class="graph-filtergroup" id="graphNodeFilters"></div>
               <div class="graph-filtergroup" id="graphEdgeFilters"></div>
               <div class="graph-filtergroup" id="graphMethodFilters"></div>
             </div>
+            <div class="graph-summary">
+              <div class="graph-stat"><div class="n" id="graphTotalNodes">0</div><div class="l">Total nodes</div></div>
+              <div class="graph-stat"><div class="n" id="graphTotalEdges">0</div><div class="l">Total edges</div></div>
+              <div class="graph-stat"><div class="n" id="graphVisibleNodes">0</div><div class="l">Visible nodes</div></div>
+              <div class="graph-stat"><div class="n" id="graphVisibleEdges">0</div><div class="l">Visible edges</div></div>
+              <div class="graph-stat"><div class="n" id="graphModeStat">Overview</div><div class="l">Current mode</div></div>
+              <div class="graph-stat"><div class="n" id="graphFocusStat">None</div><div class="l">Focused node</div></div>
+            </div>
+            <div id="graphFocusBar" class="graph-focusbar">
+              <span id="graphFocusText">Focus mode</span>
+              <button class="btn sm" id="graphFocusBack" onclick="backGraphFocus()" disabled>Back</button>
+              <button class="btn sm" onclick="expandGraphFocus()">Expand One Level</button>
+              <button class="btn sm" onclick="clearGraphPath()">Clear Path</button>
+              <button class="btn sm" onclick="clearGraphFocus()">Show Full Graph</button>
+              <span class="muted" style="font-size:10.5px">Pin Current View: TODO</span>
+              <div id="graphFocusPath" class="graph-focuspath"></div>
+            </div>
+            <div class="relation-legend">
+              <span><b>caused by</b> symptom/cause</span>
+              <span><b>fixed by</b> remedy</span>
+              <span><b>has part</b> system/part</span>
+              <span><b>spec</b> technical value</span>
+              <span><b>related</b> weaker/general</span>
+            </div>
+            <div id="graphEdgeLabelNote" class="edge-label-note">
+              Edge labels hidden because graph is dense. Use Focus mode or enable labels manually.
+            </div>
             <div class="graph-layout">
               <div>
+                <div class="graph-view-controls">
+                  <button class="btn sm" onclick="graphZoomBy(1.22)">Zoom In</button>
+                  <button class="btn sm" onclick="graphZoomBy(0.82)">Zoom Out</button>
+                  <button class="btn sm" onclick="graphFitView()">Fit</button>
+                  <button class="btn sm" onclick="graphCenterView()">Center</button>
+                  <button class="btn sm" onclick="graphResetView()">Reset</button>
+                  <span class="graph-hint">Wheel to zoom, drag empty space to pan, drag nodes to arrange</span>
+                </div>
                 <div id="graphCanvas"><svg id="graphSvg"></svg></div>
                 <div id="graphEmpty" style="display:none"></div>
+                <div id="graphEdgeTip" class="edge-tip"></div>
               </div>
               <aside id="graphInspector" class="graph-inspector">
                 <div class="graph-inspector-empty">Click a node or relationship to inspect evidence</div>
@@ -571,6 +696,25 @@
   let last = { q: "", a: "" };
   let _abortCtrl = null;
   let _msgCount = 0;
+
+  function getTheme() {
+    return document.documentElement.dataset.theme === "light" ? "light" : "dark";
+  }
+  function applyTheme(theme) {
+    const next = theme === "light" ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem("twostroke-theme", next); } catch (_) {}
+    const target = next === "light" ? "dark" : "light";
+    document.querySelectorAll("[data-theme-toggle]").forEach(btn => {
+      btn.textContent = target.charAt(0).toUpperCase() + target.slice(1);
+      btn.setAttribute("aria-label", `Switch to ${target} mode`);
+      btn.setAttribute("title", `Switch to ${target} mode`);
+    });
+  }
+  function toggleTheme() {
+    applyTheme(getTheme() === "light" ? "dark" : "light");
+  }
+  applyTheme(getTheme());
 
   // Fetch model name for status rail
   fetch("/health").then(() => {
@@ -1045,13 +1189,51 @@
     procedure:"#5dd6c8", warning:"#ff9483", unknown:"#66727e"
   };
   let _graphData = null;
+  let _graphAllNodes = [];
+  let _graphAllEdges = [];
+  let _graphBaseFiltered = { nodes: [], edges: [] };
   let _graphFiltered = { nodes: [], edges: [] };
   let _graphSelected = null;
+  let graphMode = "overview";
+  let focusedNodeId = null;
+  let focusDepth = 1;
+  let focusHistory = [];
+  let focusPath = [];
+  // Graph viewport state is owned here so rerenders, filters, resize, and toolbar
+  // actions all share the same zoom/pan transform.
+  let _graphZoom = null;
+  let _graphViewport = null;
+  let _graphSim = null;
+  let _graphFitOnNextRender = true;
+  let _graphResizeObserver = null;
   const graphState = {
     nodeTypes: new Set(NODE_TYPES),
     edgeTypes: new Set(EDGE_TYPES),
     methods: new Set(EXTRACTION_METHODS)
   };
+  const GRAPH_MODE_COPY = {
+    overview: "Overview: High-level engine systems and diagnostic concepts",
+    full: "Full Graph: All extracted and seeded KG facts",
+    focus: "Focus: Click a node to explore its local neighborhood",
+    diagnostic: "Diagnostic: Symptom → Cause → Fix paths"
+  };
+  const OVERVIEW_NODE_TYPES = new Set(["engine","system","part","symptom","cause","fix"]);
+  const DIAGNOSTIC_NODE_TYPES = new Set(["system","part","symptom","cause","fix"]);
+  const DIAGNOSTIC_EDGE_TYPES = new Set(["HAS_SYMPTOM","CAUSED_BY","FIXED_BY","HAS_PART","RELATED_TO"]);
+  const OVERVIEW_NODE_LIMIT = 85;
+
+  function markGraphEdgeLabelPreference() {
+    const toggle = document.getElementById("graphShowEdgeLabels");
+    if (toggle) toggle.dataset.userSet = "1";
+  }
+
+  function syncGraphEdgeLabelDefault(force = false) {
+    const toggle = document.getElementById("graphShowEdgeLabels");
+    if (!toggle) return;
+    if (!force && toggle.dataset.userSet === "1") return;
+    // Keep dense/full views clean, but make demo-friendly local paths readable.
+    toggle.checked = graphMode === "focus" || graphMode === "diagnostic";
+  }
 
   function _setupGraphFilterChips() {
     _renderFilterChips("graphNodeFilters", NODE_TYPES, graphState.nodeTypes, "node");
@@ -1076,8 +1258,89 @@
     applyGraphFilters();
   }
 
+  function setGraphMode(mode) {
+    graphMode = mode || "overview";
+    const sel = document.getElementById("graphMode");
+    if (sel && sel.value !== graphMode) sel.value = graphMode;
+    syncGraphEdgeLabelDefault();
+    if (graphMode !== "focus") {
+      focusedNodeId = null;
+      focusDepth = 1;
+      focusHistory = [];
+      focusPath = [];
+      _graphSelected = null;
+      _renderInspectorEmpty();
+    }
+    _graphFitOnNextRender = true;
+    applyGraphFilters();
+  }
+
+  function _safeArray(value) {
+    return Array.isArray(value) ? value : [];
+  }
+
+  function _safeProps(value) {
+    return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  }
+
+  function _sanitizeGraphNode(node, idx) {
+    const props = _safeProps(node?.props);
+    const label = node?.label || node?.name || node?.canonical_name || `Node ${idx + 1}`;
+    return {
+      ...node,
+      id: node?.id ?? `node-${idx}`,
+      label,
+      name: node?.name || label,
+      type: node?.type || "unknown",
+      canonical_name: node?.canonical_name || label,
+      aliases: Array.isArray(node?.aliases) ? node.aliases : [],
+      props
+    };
+  }
+
+  function _sanitizeGraphEdge(edge, idx) {
+    const src = _endpointId(edge || {}, "source");
+    const dst = _endpointId(edge || {}, "target");
+    if (src === undefined || src === null || dst === undefined || dst === null) return null;
+    const props = _safeProps(edge?.props);
+    return {
+      ...edge,
+      id: edge?.id ?? `edge-${idx}`,
+      source: src,
+      target: dst,
+      relation: edge?.relation || edge?.type || "RELATED_TO",
+      type: edge?.type || edge?.relation || "RELATED_TO",
+      confidence: edge?.confidence ?? props.confidence ?? null,
+      evidence: edge?.evidence || props.evidence || "",
+      extraction_method: edge?.extraction_method || props.extraction_method || "unknown",
+      props
+    };
+  }
+
+  function _setGraphStatus(message, kind = "info") {
+    const empty = document.getElementById("graphEmpty");
+    const canvas = document.getElementById("graphCanvas");
+    if (!empty || !canvas) return;
+    empty.style.display = "block";
+    empty.textContent = message;
+    empty.style.color = kind === "error" ? "var(--red)" : "var(--tx3)";
+    canvas.style.display = "none";
+  }
+
+  function _updateGraphSummary() {
+    const set = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
+    set("graphTotalNodes", _graphAllNodes.length);
+    set("graphTotalEdges", _graphAllEdges.length);
+    set("graphVisibleNodes", (_graphFiltered.nodes || []).length);
+    set("graphVisibleEdges", (_graphFiltered.edges || []).length);
+    set("graphModeStat", graphMode === "full" ? "Full" : graphMode.charAt(0).toUpperCase() + graphMode.slice(1));
+    const focused = focusedNodeId ? _nodeById(focusedNodeId) : null;
+    set("graphFocusStat", focused ? _nodeLabel(focused).slice(0, 18) : "None");
+  }
+
   async function loadGraph() {
     _setupGraphFilterChips();
+    _setGraphStatus("Loading graph...");
     const minEl = document.getElementById("graphMinConfidence");
     const showWeak = document.getElementById("graphShowWeak")?.checked;
     const showSeed = document.getElementById("graphShowSeed")?.checked !== false;
@@ -1085,20 +1348,130 @@
     try {
       const params = new URLSearchParams({ limit: "1200", min_confidence: minConfidence, include_seed: String(showSeed) });
       const r = await fetch(`/graph?${params.toString()}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
       _graphData = await r.json();
-    } catch { return; }
+      _graphAllNodes = _safeArray(_graphData.nodes).map(_sanitizeGraphNode);
+      _graphAllEdges = _safeArray(_graphData.edges).map(_sanitizeGraphEdge).filter(Boolean);
+    } catch (err) {
+      _graphData = { nodes: [], edges: [] };
+      _graphAllNodes = [];
+      _graphAllEdges = [];
+      _graphFiltered = { nodes: [], edges: [] };
+      _updateGraphSummary();
+      _setGraphStatus("Could not load graph. Check backend logs.", "error");
+      return;
+    }
+    _graphFitOnNextRender = true;
     applyGraphFilters();
+  }
+
+  function _endpointId(edge, key) {
+    const value = edge[key];
+    return typeof value === "object" && value ? value.id : value;
+  }
+
+  function _edgeConfidenceValue(edge) {
+    const value = edge.confidence ?? (edge.props || {}).confidence;
+    const n = Number(value);
+    return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : null;
+  }
+
+  function _degreeMap(edges) {
+    const deg = new Map();
+    (edges || []).forEach(e => {
+      const s = String(_endpointId(e, "source"));
+      const t = String(_endpointId(e, "target"));
+      deg.set(s, (deg.get(s) || 0) + 1);
+      deg.set(t, (deg.get(t) || 0) + 1);
+    });
+    return deg;
+  }
+
+  function _rankNodesForDemo(nodes, edges, limit) {
+    const deg = _degreeMap(edges);
+    return [...nodes].sort((a, b) => {
+      const pa = (a.props || {}).extraction_method === "manual_seed" ? 3 : 0;
+      const pb = (b.props || {}).extraction_method === "manual_seed" ? 3 : 0;
+      const ca = Number(a.confidence ?? (a.props || {}).confidence ?? 0.6);
+      const cb = Number(b.confidence ?? (b.props || {}).confidence ?? 0.6);
+      return ((deg.get(String(b.id)) || 0) * 4 + pb + cb) - ((deg.get(String(a.id)) || 0) * 4 + pa + ca);
+    }).slice(0, limit);
+  }
+
+  function _applyGraphMode(data) {
+    const mode = graphMode || "overview";
+    const allNodes = data.nodes || [];
+    const allEdges = data.edges || [];
+    if (mode === "full" || mode === "focus") {
+      return { nodes: allNodes, edges: allEdges, note: GRAPH_MODE_COPY[mode] };
+    }
+
+    if (mode === "diagnostic") {
+      const candidateNodes = allNodes.filter(n => DIAGNOSTIC_NODE_TYPES.has(n.type || "unknown"));
+      const candidateIds = new Set(candidateNodes.map(n => String(n.id)));
+      let edges = allEdges.filter(e => {
+        const rel = e.relation || e.type;
+        const conf = _edgeConfidenceValue(e);
+        const method = e.extraction_method || (e.props || {}).extraction_method || "unknown";
+        const s = String(_endpointId(e, "source"));
+        const t = String(_endpointId(e, "target"));
+        if (!candidateIds.has(s) || !candidateIds.has(t)) return false;
+        if (!DIAGNOSTIC_EDGE_TYPES.has(rel)) return false;
+        return method === "manual_seed" || conf === null || conf >= 0.45;
+      });
+      const connected = new Set(edges.flatMap(e => [String(_endpointId(e, "source")), String(_endpointId(e, "target"))]));
+      return {
+        nodes: candidateNodes.filter(n => connected.has(String(n.id))),
+        edges,
+        note: GRAPH_MODE_COPY.diagnostic
+      };
+    }
+
+    const candidateNodes = allNodes.filter(n => OVERVIEW_NODE_TYPES.has(n.type || "unknown"));
+    const candidateIds = new Set(candidateNodes.map(n => String(n.id)));
+    let edges = allEdges.filter(e => {
+      const conf = _edgeConfidenceValue(e);
+      const method = e.extraction_method || (e.props || {}).extraction_method || "unknown";
+      const s = String(_endpointId(e, "source"));
+      const t = String(_endpointId(e, "target"));
+      if (!candidateIds.has(s) || !candidateIds.has(t)) return false;
+      return method === "manual_seed" || conf === null || conf >= 0.55;
+    });
+    let connected = new Set(edges.flatMap(e => [String(_endpointId(e, "source")), String(_endpointId(e, "target"))]));
+    let nodes = candidateNodes.filter(n => connected.has(String(n.id)));
+    const capped = nodes.length > OVERVIEW_NODE_LIMIT;
+    if (capped) {
+      nodes = _rankNodesForDemo(nodes, edges, OVERVIEW_NODE_LIMIT);
+      const keep = new Set(nodes.map(n => String(n.id)));
+      edges = edges.filter(e => keep.has(String(_endpointId(e, "source"))) && keep.has(String(_endpointId(e, "target"))));
+    }
+    return {
+      nodes,
+      edges,
+      note: capped
+        ? "Overview: Showing top diagnostic graph. Use Full Graph for all entities."
+        : GRAPH_MODE_COPY.overview
+    };
   }
 
   function applyGraphFilters() {
     _setupGraphFilterChips();
-    const data = _graphData || { nodes: [], edges: [] };
+    const data = {
+      nodes: _graphAllNodes.length ? _graphAllNodes : ((_graphData || {}).nodes || []),
+      edges: _graphAllEdges.length ? _graphAllEdges : ((_graphData || {}).edges || [])
+    };
+    const modeData = _applyGraphMode(data);
+    const modeHint = document.getElementById("graphModeHint");
+    if (modeHint) {
+      modeHint.textContent = modeData.note || GRAPH_MODE_COPY[graphMode] || "";
+      modeHint.classList.toggle("warn", (modeData.note || "").includes("Showing top"));
+    }
     const q = (document.getElementById("graphSearch")?.value || "").trim().toLowerCase();
     const showDocFacts = document.getElementById("graphShowDocFacts")?.checked !== false;
     const showSeed = document.getElementById("graphShowSeed")?.checked !== false;
     const showWeak = document.getElementById("graphShowWeak")?.checked === true;
     const minConfidence = Number(document.getElementById("graphMinConfidence")?.value || 0.4);
-    const nodeMap = new Map((data.nodes || []).map(n => [String(n.id), n]));
+    const nodeMap = new Map((modeData.nodes || []).map(n => [String(n.id), n]));
     const matchesSearch = n => {
       if (!q) return true;
       const aliases = Array.isArray(n.aliases) ? n.aliases.join(" ") : "";
@@ -1110,7 +1483,7 @@
       const t = nodeMap.get(String(e.target));
       return matchesSearch(s || {}) || matchesSearch(t || {}) || `${e.relation || e.type || ""} ${e.evidence || ""}`.toLowerCase().includes(q);
     };
-    const edges = (data.edges || []).filter(e => {
+    const edges = (modeData.edges || []).filter(e => {
       const method = e.extraction_method || (e.props || {}).extraction_method || "unknown";
       const confidence = _edgeConfidence(e);
       if (!graphState.edgeTypes.has(e.relation || e.type)) return false;
@@ -1121,16 +1494,19 @@
       return edgeMatchesSearch(e);
     });
     const connectedIds = new Set(edges.flatMap(e => [String(e.source), String(e.target)]));
-    const nodes = (data.nodes || []).filter(n => {
+    const nodes = (modeData.nodes || []).filter(n => {
       if (!graphState.nodeTypes.has(n.type || "unknown")) return false;
       if (!connectedIds.has(String(n.id)) && edges.length) return false;
       return matchesSearch(n) || connectedIds.has(String(n.id));
     });
     const visibleIds = new Set(nodes.map(n => String(n.id)));
-    _graphFiltered = {
+    _graphBaseFiltered = {
       nodes,
       edges: edges.filter(e => visibleIds.has(String(e.source)) && visibleIds.has(String(e.target)))
     };
+    _graphFiltered = _applyGraphFocus(_graphBaseFiltered);
+    _updateGraphFocusBar();
+    _updateGraphSummary();
     _renderGraph(_graphFiltered, q);
     if (_graphSelected) _refreshInspectorSelection();
   }
@@ -1153,12 +1529,362 @@
   }
 
   function _nodeById(id) {
-    return (_graphFiltered.nodes || []).find(n => String(n.id) === String(id)) || (_graphData?.nodes || []).find(n => String(n.id) === String(id));
+    return (_graphFiltered.nodes || []).find(n => String(n.id) === String(id))
+      || (_graphBaseFiltered.nodes || []).find(n => String(n.id) === String(id))
+      || (_graphAllNodes || []).find(n => String(n.id) === String(id))
+      || (_graphData?.nodes || []).find(n => String(n.id) === String(id));
   }
 
   function _edgeEndpoint(edge, key) {
     const value = edge[key];
     return typeof value === "object" && value ? value.id : value;
+  }
+
+  function _nodeLabel(node) {
+    return node?.label || node?.name || node?.canonical_name || String(node?.id || "Unknown");
+  }
+
+  function _edgePassesVisibleToggles(edge) {
+    const method = edge.extraction_method || (edge.props || {}).extraction_method || "unknown";
+    const confidence = _edgeConfidence(edge);
+    const showDocFacts = document.getElementById("graphShowDocFacts")?.checked !== false;
+    const showSeed = document.getElementById("graphShowSeed")?.checked !== false;
+    const showWeak = document.getElementById("graphShowWeak")?.checked === true;
+    const minConfidence = Number(document.getElementById("graphMinConfidence")?.value || 0.4);
+    if (!graphState.edgeTypes.has(edge.relation || edge.type)) return false;
+    if (!graphState.methods.has(method)) return false;
+    if (!showSeed && method === "manual_seed") return false;
+    if (!showDocFacts && method !== "manual_seed") return false;
+    if (!showWeak && confidence !== null && confidence < minConfidence && method !== "manual_seed") return false;
+    return true;
+  }
+
+  function _applyGraphFocus(graph) {
+    if (!focusedNodeId) return graph;
+    // Deep-dive focus always recomputes from the preserved full graph arrays,
+    // not the currently visible subset, so clicking a neighbor can reveal that
+    // neighbor's own local context even if it was previously hidden.
+    const nodes = _graphAllNodes.length ? _graphAllNodes : (graph.nodes || []);
+    const edges = (_graphAllEdges.length ? _graphAllEdges : (graph.edges || [])).filter(_edgePassesVisibleToggles);
+    const nodeIds = new Set(nodes.map(n => String(n.id)));
+    const visibleIds = new Set([String(focusedNodeId)]);
+    if (!nodeIds.has(String(focusedNodeId))) return { nodes: [], edges: [] };
+
+    // Focus mode is display-only: walk outward from the selected node while
+    // leaving allNodes/allEdges intact for later deep-dive navigation.
+    let frontier = new Set([String(focusedNodeId)]);
+    for (let depth = 0; depth < Math.max(1, focusDepth); depth++) {
+      const next = new Set();
+      edges.forEach(e => {
+        const src = String(_edgeEndpoint(e, "source"));
+        const dst = String(_edgeEndpoint(e, "target"));
+        if (frontier.has(src) && nodeIds.has(dst)) next.add(dst);
+        if (frontier.has(dst) && nodeIds.has(src)) next.add(src);
+      });
+      next.forEach(id => visibleIds.add(id));
+      frontier = next;
+      if (!frontier.size) break;
+    }
+    const visibleNodes = nodes.filter(n => visibleIds.has(String(n.id)) && (String(n.id) === String(focusedNodeId) || graphState.nodeTypes.has(n.type || "unknown")));
+    const finalIds = new Set(visibleNodes.map(n => String(n.id)));
+    return {
+      nodes: visibleNodes,
+      edges: edges.filter(e => finalIds.has(String(_edgeEndpoint(e, "source"))) && finalIds.has(String(_edgeEndpoint(e, "target"))))
+    };
+  }
+
+  function focusGraphNode(node, depth, showDrawer = true, pushHistory = true) {
+    if (!node) return;
+    const wasInFocusMode = graphMode === "focus" && focusedNodeId;
+    graphMode = "focus";
+    const sel = document.getElementById("graphMode");
+    if (sel) sel.value = "focus";
+    syncGraphEdgeLabelDefault();
+    const nextId = String(node.id);
+    if (pushHistory) {
+      if (!wasInFocusMode) {
+        focusPath = [nextId];
+      } else {
+        const existingIndex = focusPath.findIndex(id => String(id) === nextId);
+        if (existingIndex >= 0) {
+          focusPath = focusPath.slice(0, existingIndex + 1);
+        } else if (String(focusPath[focusPath.length - 1]) !== nextId) {
+          focusPath.push(nextId);
+        }
+      }
+      focusHistory = focusPath.slice(0, -1).map(String);
+    }
+    focusedNodeId = String(node.id);
+    focusDepth = Math.max(1, depth || focusDepth || 1);
+    _graphSelected = { kind: "node", id: node.id };
+    _graphFiltered = _applyGraphFocus(_graphBaseFiltered);
+    _updateGraphFocusBar();
+    _updateGraphSummary();
+    _graphFitOnNextRender = true;
+    _renderGraph(_graphFiltered, (document.getElementById("graphSearch")?.value || "").trim().toLowerCase());
+    if (showDrawer) {
+      const focused = _nodeById(node.id) || node;
+      showGraphNode(focused, true);
+    }
+    setTimeout(() => graphFitView(), 360);
+  }
+
+  function clearGraphFocus() {
+    graphMode = "full";
+    const sel = document.getElementById("graphMode");
+    if (sel) sel.value = "full";
+    syncGraphEdgeLabelDefault();
+    focusedNodeId = null;
+    focusDepth = 1;
+    focusHistory = [];
+    focusPath = [];
+    _graphSelected = null;
+    _graphFiltered = _graphBaseFiltered;
+    _updateGraphFocusBar();
+    _updateGraphSummary();
+    _renderInspectorEmpty();
+    _graphFitOnNextRender = true;
+    _renderGraph(_graphFiltered, (document.getElementById("graphSearch")?.value || "").trim().toLowerCase());
+    setTimeout(() => graphFitView(), 360);
+  }
+
+  function clearGraphPath() {
+    graphMode = "overview";
+    const sel = document.getElementById("graphMode");
+    if (sel) sel.value = "overview";
+    syncGraphEdgeLabelDefault();
+    focusedNodeId = null;
+    focusDepth = 1;
+    focusHistory = [];
+    focusPath = [];
+    _graphSelected = null;
+    _renderInspectorEmpty();
+    _graphFitOnNextRender = true;
+    applyGraphFilters();
+  }
+
+  function expandGraphFocus() {
+    if (!focusedNodeId) return;
+    focusDepth = Math.min(2, (focusDepth || 1) + 1);
+    const node = _nodeById(focusedNodeId) || (_graphBaseFiltered.nodes || []).find(n => String(n.id) === String(focusedNodeId));
+    focusGraphNode(node, focusDepth, true, false);
+  }
+
+  function backGraphFocus() {
+    if (focusPath.length <= 1) return;
+    focusPath.pop();
+    focusHistory = focusPath.slice(0, -1).map(String);
+    const previousId = focusPath[focusPath.length - 1];
+    const previousNode = _nodeById(previousId) || (_graphAllNodes || []).find(n => String(n.id) === String(previousId));
+    focusGraphNode(previousNode, 1, true, false);
+  }
+
+  function _updateGraphFocusBar() {
+    const bar = document.getElementById("graphFocusBar");
+    const text = document.getElementById("graphFocusText");
+    const back = document.getElementById("graphFocusBack");
+    const pathEl = document.getElementById("graphFocusPath");
+    if (!bar || !text) return;
+    if (!focusedNodeId) {
+      bar.classList.remove("on");
+      text.textContent = "";
+      if (pathEl) pathEl.innerHTML = "";
+      if (back) back.disabled = true;
+      return;
+    }
+    const node = _nodeById(focusedNodeId) || (_graphAllNodes || []).find(n => String(n.id) === String(focusedNodeId));
+    const count = Math.max(0, (_graphFiltered.nodes || []).length - 1);
+    const edgeCount = (_graphFiltered.edges || []).length;
+    bar.classList.add("on");
+    text.innerHTML = count
+      ? `Focus mode: <b>${_esc(_nodeLabel(node))}</b> — depth ${focusDepth}, showing ${count} connected nodes and ${edgeCount} edges`
+      : `Focus mode: <b>${_esc(_nodeLabel(node))}</b> — No neighbors found for selected node.`;
+    if (back) back.disabled = focusPath.length <= 1;
+    if (pathEl) {
+      const ids = focusPath.length ? focusPath : [String(focusedNodeId)];
+      pathEl.innerHTML = '<span>Selected path:</span> ' + ids.map((id, i) => {
+        const n = _nodeById(id) || (_graphAllNodes || []).find(node => String(node.id) === String(id));
+        const sep = i ? '<span>&gt;</span>' : '';
+        return `${sep}<button onclick="jumpGraphFocus('${_esc(id)}', ${i})">${i + 1}. ${_esc(_nodeLabel(n))}</button>`;
+      }).join("");
+    }
+  }
+
+  function jumpGraphFocus(id, pathIndex) {
+    const node = _nodeById(id) || (_graphAllNodes || []).find(n => String(n.id) === String(id));
+    focusHistory = focusPath.slice(0, pathIndex).map(String);
+    focusPath = focusPath.slice(0, pathIndex + 1).map(String);
+    focusGraphNode(node, 1, true, false);
+  }
+
+  function _pathIndexForNode(id) {
+    const idx = focusPath.findIndex(pathId => String(pathId) === String(id));
+    return idx >= 0 ? idx + 1 : null;
+  }
+
+  function _pathEdgeKeys() {
+    const keys = new Set();
+    for (let i = 0; i < focusPath.length - 1; i++) {
+      const a = String(focusPath[i]);
+      const b = String(focusPath[i + 1]);
+      keys.add(`${a}->${b}`);
+      keys.add(`${b}->${a}`);
+    }
+    return keys;
+  }
+
+  const IMPORTANT_EDGE_TYPES = new Set(["CAUSED_BY","FIXED_BY","HAS_PART","HAS_SPEC","REQUIRES_PROCEDURE"]);
+  const EDGE_LABELS = {
+    CAUSED_BY: "caused by",
+    FIXED_BY: "fixed by",
+    HAS_PART: "has part",
+    HAS_SPEC: "spec",
+    REQUIRES_PROCEDURE: "procedure",
+    HAS_SYSTEM: "system",
+    HAS_SYMPTOM: "symptom",
+    MENTIONED_IN: "mentioned",
+    EVIDENCED_BY: "evidence",
+    TESTED_BY: "tested by",
+    RELATED_TO: "related"
+  };
+
+  function _edgeRelation(edge) {
+    return edge?.relation || edge?.type || "RELATED_TO";
+  }
+
+  function _edgeLabelText(edge) {
+    const rel = _edgeRelation(edge);
+    return EDGE_LABELS[rel] || String(rel || "related").toLowerCase().replaceAll("_", " ");
+  }
+
+  function _isImportantEdge(edge) {
+    return IMPORTANT_EDGE_TYPES.has(_edgeRelation(edge));
+  }
+
+  function _edgeIsPath(edge, pathKeys) {
+    const src = String(_edgeEndpoint(edge, "source"));
+    const dst = String(_edgeEndpoint(edge, "target"));
+    return pathKeys.has(`${src}->${dst}`);
+  }
+
+  function _edgeLabelsRequested() {
+    return document.getElementById("graphShowEdgeLabels")?.checked === true;
+  }
+
+  function _shouldShowEdgeLabel(edge, edgeCount, pathKeys) {
+    if (_graphSelected?.kind === "edge" && String(_graphSelected.id) === String(edge.id)) return true;
+    if (_edgeIsPath(edge, pathKeys)) return true;
+    if (!_edgeLabelsRequested()) return false;
+    if (focusedNodeId || graphMode === "focus") return edgeCount <= 80 || _isImportantEdge(edge);
+    if (graphMode === "diagnostic") return _isImportantEdge(edge) || edgeCount <= 70;
+    if (graphMode === "overview") return _isImportantEdge(edge) && (_edgeConfidence(edge) === null || _edgeConfidence(edge) >= 0.55);
+    return false;
+  }
+
+  function _edgeLabelToggleDefault(edgeCount) {
+    return _edgeLabelsRequested();
+  }
+
+  function _edgeEvidence(edge) {
+    return edge?.evidence || (edge?.props || {}).evidence || "No evidence stored";
+  }
+
+  function showEdgeTip(ev, edge) {
+    const tip = document.getElementById("graphEdgeTip");
+    if (!tip) return;
+    const conf = _edgeConfidence(edge);
+    const evidence = _edgeEvidence(edge);
+    tip.innerHTML = `<b>${_esc(_edgeLabelText(edge))}</b>${conf === null ? "" : ` · ${Math.round(conf * 100)}%`}<br>${_esc(evidence.slice(0, 180))}${evidence.length > 180 ? "..." : ""}`;
+    tip.style.display = "block";
+    tip.style.left = Math.min(window.innerWidth - 340, ev.clientX + 14) + "px";
+    tip.style.top = Math.min(window.innerHeight - 120, ev.clientY + 14) + "px";
+  }
+
+  function moveEdgeTip(ev) {
+    const tip = document.getElementById("graphEdgeTip");
+    if (!tip || tip.style.display === "none") return;
+    tip.style.left = Math.min(window.innerWidth - 340, ev.clientX + 14) + "px";
+    tip.style.top = Math.min(window.innerHeight - 120, ev.clientY + 14) + "px";
+  }
+
+  function hideEdgeTip() {
+    const tip = document.getElementById("graphEdgeTip");
+    if (tip) tip.style.display = "none";
+  }
+
+  function _updateEdgeLabelNote(edgeCount, labelsEnabled) {
+    const note = document.getElementById("graphEdgeLabelNote");
+    if (!note) return;
+    const denseFull = graphMode === "full" && edgeCount > 35 && !labelsEnabled;
+    note.classList.toggle("on", denseFull);
+  }
+
+  function _graphSize() {
+    const canvas = document.getElementById("graphCanvas");
+    return {
+      w: Math.max(320, canvas?.clientWidth || 800),
+      h: Math.max(260, canvas?.clientHeight || 460)
+    };
+  }
+
+  function _ensureGraphResizeObserver() {
+    const canvas = document.getElementById("graphCanvas");
+    if (!canvas || _graphResizeObserver || typeof ResizeObserver === "undefined") return;
+    // ResizeObserver keeps the SVG viewBox aligned with CSS resize handles and
+    // browser window changes without re-fetching graph data.
+    _graphResizeObserver = new ResizeObserver(() => {
+      const svg = d3.select("#graphSvg");
+      const { w, h } = _graphSize();
+      svg.attr("viewBox", `0 0 ${w} ${h}`);
+      if (_graphFiltered.nodes?.length) {
+        clearTimeout(_ensureGraphResizeObserver._timer);
+        _ensureGraphResizeObserver._timer = setTimeout(() => graphFitView(), 120);
+      }
+    });
+    _graphResizeObserver.observe(canvas);
+  }
+
+  function graphZoomBy(factor) {
+    try {
+      const svg = d3.select("#graphSvg");
+      if (!_graphZoom || !svg.node()) return;
+      svg.transition().duration(180).call(_graphZoom.scaleBy, factor);
+    } catch (_) {}
+  }
+
+  function graphResetView() {
+    try {
+      const svg = d3.select("#graphSvg");
+      if (!_graphZoom || !svg.node()) return;
+      svg.transition().duration(220).call(_graphZoom.transform, d3.zoomIdentity);
+    } catch (_) {}
+  }
+
+  function graphCenterView() {
+    try {
+      const svg = d3.select("#graphSvg");
+      if (!_graphZoom || !_graphViewport || !svg.node()) return;
+      const { w, h } = _graphSize();
+      const box = _graphViewport.node().getBBox();
+      const tx = w / 2 - (box.x + box.width / 2);
+      const ty = h / 2 - (box.y + box.height / 2);
+      svg.transition().duration(220).call(_graphZoom.transform, d3.zoomIdentity.translate(tx, ty));
+    } catch (_) {}
+  }
+
+  function graphFitView() {
+    try {
+      const svg = d3.select("#graphSvg");
+      if (!_graphZoom || !_graphViewport || !svg.node()) return;
+      const box = _graphViewport.node().getBBox();
+      if (!box.width || !box.height) return;
+      const { w, h } = _graphSize();
+      const pad = 52;
+      const scale = Math.max(0.25, Math.min(2.5, Math.min((w - pad) / box.width, (h - pad) / box.height)));
+      const tx = w / 2 - scale * (box.x + box.width / 2);
+      const ty = h / 2 - scale * (box.y + box.height / 2);
+      svg.transition().duration(320).call(_graphZoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale));
+    } catch (_) {}
   }
 
   function _renderGraph(data, query) {
@@ -1201,58 +1927,158 @@
   // ── Entities ──────────────────────────────────────────────────────────
   function _renderGraphRich(data, query) {
     const svg = d3.select("#graphSvg");
+    const previousTransform = svg.node() ? d3.zoomTransform(svg.node()) : d3.zoomIdentity;
     svg.selectAll("*").remove();
     const empty = document.getElementById("graphEmpty");
     if (!data || !data.nodes || !data.nodes.length) {
       empty.style.display = "block";
-      empty.textContent = "No matching graph nodes. Adjust filters or ingest documents.";
+      empty.textContent = _graphAllNodes.length
+        ? "No matching graph nodes. Adjust filters, switch mode, or show the full graph."
+        : "No graph data yet. Upload and ingest documents first.";
       document.getElementById("graphCanvas").style.display = "none";
       return;
     }
     empty.style.display = "none";
     document.getElementById("graphCanvas").style.display = "block";
-    const W = document.getElementById("graphCanvas").clientWidth || 800, H = 460;
+    _ensureGraphResizeObserver();
+    const { w: W, h: H } = _graphSize();
     svg.attr("viewBox", `0 0 ${W} ${H}`);
     const nodes = data.nodes.map(d => ({...d}));
     const edges = data.edges.map(d => ({...d}));
+    const dense = nodes.length > 70 || edges.length > 110;
+    const labelMode = graphMode === "focus" || focusedNodeId || graphMode === "diagnostic" || graphMode === "overview" || nodes.length <= 45;
+    const pathEdgeKeys = _pathEdgeKeys();
+    const edgeLabelsEnabled = _edgeLabelToggleDefault(edges.length);
+    _updateEdgeLabelNote(edges.length, edgeLabelsEnabled);
+    if (_graphSim) {
+      try { _graphSim.stop(); } catch (_) {}
+    }
+
+    const zoomRoot = svg.append("g").attr("class", "graph-viewport");
+    _graphViewport = zoomRoot;
+    _graphZoom = d3.zoom()
+      .scaleExtent([0.18, 4])
+      .filter(ev => {
+        if (ev.type === "dblclick") return false;
+        if (ev.target?.closest?.(".node")) return false;
+        return !ev.ctrlKey || ev.type === "wheel";
+      })
+      .on("zoom", ev => zoomRoot.attr("transform", ev.transform));
+    // Wheel/trackpad zoom and empty-canvas drag-pan are handled by D3 zoom.
+    svg.call(_graphZoom).on("dblclick.zoom", null);
+    if (!_graphFitOnNextRender) {
+      svg.call(_graphZoom.transform, previousTransform);
+    }
+
     const sim = d3.forceSimulation(nodes)
       .force("link", d3.forceLink(edges).id(d => d.id).distance(d => (d.relation === "RELATED_TO" ? 115 : 92)))
       .force("charge", d3.forceManyBody().strength(-230))
       .force("center", d3.forceCenter(W/2, H/2))
       .force("collision", d3.forceCollide(34));
-    const link = svg.append("g").selectAll("line").data(edges).join("line")
-      .attr("class", d => "link" + (_graphSelected?.kind === "edge" && _graphSelected.id === d.id ? " selected" : ""))
-      .attr("stroke-width", d => 1.2 + ((_edgeConfidence(d) ?? .45) * 2.2))
+    _graphSim = sim;
+    const link = zoomRoot.append("g").selectAll("line").data(edges).join("line")
+      .attr("class", d => {
+        const src = String(_edgeEndpoint(d, "source"));
+        const dst = String(_edgeEndpoint(d, "target"));
+        return "link"
+          + (_graphSelected?.kind === "edge" && _graphSelected.id === d.id ? " selected" : "")
+          + (pathEdgeKeys.has(`${src}->${dst}`) ? " path-edge" : "");
+      })
+      .attr("stroke-width", d => {
+        const src = String(_edgeEndpoint(d, "source"));
+        const dst = String(_edgeEndpoint(d, "target"));
+        return (pathEdgeKeys.has(`${src}->${dst}`) ? 3.8 : 1.2) + ((_edgeConfidence(d) ?? .45) * 2.2);
+      })
       .attr("stroke-dasharray", d => (d.extraction_method || "") === "manual_seed" ? "4 4" : null)
-      .on("click", (ev,d) => { ev.stopPropagation(); showGraphEdge(d); });
-    const llab = svg.append("g").selectAll("text").data(edges).join("text")
-      .attr("class","link-label")
-      .text(d => `${d.relation || d.type || "RELATED"} ${_edgeConfidence(d) === null ? "" : Math.round(_edgeConfidence(d) * 100)}`)
-      .on("click", (ev,d) => { ev.stopPropagation(); showGraphEdge(d); });
-    const node = svg.append("g").selectAll("g").data(nodes).join("g")
+      .on("mouseenter", (ev,d) => showEdgeTip(ev, d))
+      .on("mousemove", (ev) => moveEdgeTip(ev))
+      .on("mouseleave", hideEdgeTip)
+      .on("click", (ev,d) => { ev.stopPropagation(); hideEdgeTip(); showGraphEdge(d); });
+    const edgeLabels = zoomRoot.append("g").selectAll("g").data(edges).join("g")
+      .attr("class", d => "edge-label"
+        + (_isImportantEdge(d) ? " important" : "")
+        + (_graphSelected?.kind === "edge" && String(_graphSelected.id) === String(d.id) ? " selected" : "")
+        + (_edgeIsPath(d, pathEdgeKeys) ? " path" : ""))
+      .style("display", d => _shouldShowEdgeLabel(d, edges.length, pathEdgeKeys) ? null : "none")
+      .on("mouseenter", (ev,d) => showEdgeTip(ev, d))
+      .on("mousemove", (ev) => moveEdgeTip(ev))
+      .on("mouseleave", hideEdgeTip)
+      .on("click", (ev,d) => { ev.stopPropagation(); hideEdgeTip(); showGraphEdge(d); });
+    edgeLabels.append("rect").attr("rx",5).attr("ry",5);
+    edgeLabels.append("text").attr("text-anchor","middle").attr("dy","0.35em").text(d => {
+      const conf = _edgeConfidence(d);
+      return `${_edgeLabelText(d)}${conf === null || graphMode === "full" ? "" : ` ${Math.round(conf * 100)}`}`;
+    });
+    edgeLabels.each(function() {
+      const g = d3.select(this);
+      const text = g.select("text").node();
+      if (!text) return;
+      const box = text.getBBox();
+      g.select("rect").attr("x", box.x - 6).attr("y", box.y - 3).attr("width", box.width + 12).attr("height", box.height + 6);
+    });
+    const node = zoomRoot.append("g").selectAll("g").data(nodes).join("g")
       .attr("class", d => {
         const text = `${d.label || d.name || ""} ${d.canonical_name || ""} ${(d.aliases || []).join(" ")}`.toLowerCase();
         const selected = _graphSelected?.kind === "node" && String(_graphSelected.id) === String(d.id);
-        return "node" + (query && text.includes(query) ? " match" : "") + (selected ? " selected" : "");
+        const focused = focusedNodeId && String(focusedNodeId) === String(d.id);
+        const inPath = focusPath.includes(String(d.id)) && !focused;
+        const neighbor = focusedNodeId && !focused && (_graphFiltered.edges || []).some(e => {
+          const src = String(_edgeEndpoint(e, "source"));
+          const dst = String(_edgeEndpoint(e, "target"));
+          return (src === String(focusedNodeId) && dst === String(d.id)) || (dst === String(focusedNodeId) && src === String(d.id));
+        });
+        return "node" + (query && text.includes(query) ? " match" : "") + (selected ? " selected" : "") + (focused ? " focused" : "") + (inPath ? " path" : "") + (neighbor ? " neighbor" : "");
       })
-      .on("click", (ev,d) => { ev.stopPropagation(); showGraphNode(d); })
+      .on("click", (ev,d) => { ev.stopPropagation(); focusGraphNode(d, 1, true); })
       .call(d3.drag()
-        .on("start",(ev,d)=>{ if(!ev.active) sim.alphaTarget(.3).restart(); d.fx=d.x; d.fy=d.y; })
-        .on("drag", (ev,d)=>{ d.fx=ev.x; d.fy=ev.y; })
+        .container(() => zoomRoot.node())
+        .on("start",(ev,d)=>{ ev.sourceEvent?.stopPropagation?.(); if(!ev.active) sim.alphaTarget(.3).restart(); d.fx=d.x; d.fy=d.y; })
+        .on("drag", (ev,d)=>{ ev.sourceEvent?.stopPropagation?.(); d.fx=ev.x; d.fy=ev.y; })
         .on("end",  (ev,d)=>{ if(!ev.active) sim.alphaTarget(0); d.fx=null; d.fy=null; }));
-    node.append("circle").attr("r",15).attr("fill",d=>NODE_COLOR[d.type]||NODE_COLOR.unknown);
-    node.append("text").attr("class","node-type-label").attr("dy",3).attr("text-anchor","middle").text(d=>(d.type||"?").slice(0,3));
-    node.append("text").attr("dy",26).attr("text-anchor","middle").text(d=>{
+    node.append("circle").attr("r", d => {
+      if (focusedNodeId && String(focusedNodeId) === String(d.id)) return 23;
+      if (_graphSelected?.kind === "node" && String(_graphSelected.id) === String(d.id)) return 20;
+      if (focusedNodeId) return 17;
+      if (graphMode === "overview") return 16;
+      return dense ? 10 : 14;
+    }).attr("fill",d=>NODE_COLOR[d.type || "unknown"]||NODE_COLOR.unknown);
+    node.append("text")
+      .attr("class","node-type-label")
+      .attr("dy",3)
+      .attr("text-anchor","middle")
+      .style("display", dense && !focusedNodeId && graphMode === "full" ? "none" : null)
+      .text(d=>(d.type||"unknown").slice(0,3));
+    node.append("text").attr("class","node-label").attr("dy",d=>focusedNodeId && String(focusedNodeId) === String(d.id) ? 34 : 28).attr("text-anchor","middle").style("display", d => {
+      if (!labelMode) return "none";
+      if (graphMode === "overview" && nodes.length > 55) {
+        const isMajor = ["engine","system","symptom","cause","fix"].includes(d.type || "unknown");
+        return isMajor ? null : "none";
+      }
+      return null;
+    }).text(d=>{
       const label = d.label || d.name || "unknown";
-      return label.length>17 ? label.slice(0,15)+"..." : label;
+      const max = focusedNodeId && String(focusedNodeId) === String(d.id) ? 24 : 17;
+      return label.length>max ? label.slice(0,max-2)+"..." : label;
     });
+    const badges = node.filter(d => _pathIndexForNode(d.id));
+    const badge = badges.append("g")
+      .attr("class","path-step-badge")
+      .attr("transform",d=>`translate(${focusedNodeId && String(focusedNodeId) === String(d.id) ? 19 : 14},${focusedNodeId && String(focusedNodeId) === String(d.id) ? -19 : -14})`);
+    badge.append("circle").attr("r",9);
+    badge.append("text").attr("text-anchor","middle").attr("dy","0.35em").text(d=>_pathIndexForNode(d.id));
     node.append("title").text(d=>`[${d.type || "unknown"}] ${d.label || d.name || "unknown"}`);
     svg.on("click", () => { _graphSelected = null; _renderInspectorEmpty(); _renderGraph(_graphFiltered, query); });
     sim.on("tick",()=>{
       link.attr("x1",d=>d.source.x).attr("y1",d=>d.source.y).attr("x2",d=>d.target.x).attr("y2",d=>d.target.y);
-      llab.attr("x",d=>(d.source.x+d.target.x)/2).attr("y",d=>(d.source.y+d.target.y)/2);
+      edgeLabels.attr("transform",d=>`translate(${(d.source.x+d.target.x)/2},${(d.source.y+d.target.y)/2})`);
       node.attr("transform",d=>`translate(${d.x},${d.y})`);
     });
+    // Fit after the simulation has had a moment to spread nodes into a stable
+    // shape. Refreshes and first load opt into this; manual redraws keep zoom.
+    if (_graphFitOnNextRender) {
+      setTimeout(() => graphFitView(), 420);
+      _graphFitOnNextRender = false;
+    }
   }
 
   function _renderInspectorEmpty() {

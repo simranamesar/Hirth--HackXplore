@@ -1,6 +1,6 @@
-# TwoStrokeGPT
+# TorqBase
 
-AI-powered knowledge platform for two-stroke engines (Hirth Engines challenge). Upload technical documents in any format; ask questions in English or German and get **cited, self-checked** answers.
+AI-powered TorqBase knowledge platform for two-stroke engines (Hirth Engines challenge). Upload technical documents in any format; ask questions in English or German and get **cited, self-checked** answers.
 
 > For development conventions and architecture rules, see **CLAUDE.md**.
 
