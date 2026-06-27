@@ -15,6 +15,25 @@ def _model():
 
 
 def rerank(query: str, candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Score (query, chunk) pairs and return the top RERANK_TOP_K.
-    TODO: model().predict([(query, c['content']) for c in candidates]); sort desc."""
-    raise NotImplementedError("TODO: cross-encoder rerank")
+    """Score every (query, chunk) pair with a cross-encoder and return the top RERANK_TOP_K.
+
+    Attaches 'rerank_score' to each returned chunk.
+    Returns candidates unchanged (sorted by original score) if list is empty.
+    """
+    if not candidates:
+        return candidates
+
+    model = _model()
+    pairs = [(query, c["content"]) for c in candidates]
+    scores = model.predict(pairs)
+
+    top_k = get_settings().rerank_top_k
+    ranked = sorted(zip(scores, candidates), key=lambda x: float(x[0]), reverse=True)[:top_k]
+
+    result = []
+    for score, chunk in ranked:
+        chunk = dict(chunk)
+        chunk["rerank_score"] = float(score)
+        result.append(chunk)
+
+    return result

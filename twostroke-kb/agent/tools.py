@@ -20,8 +20,55 @@ def graph_lookup(entity: str, relation: str | None = None) -> list[dict[str, Any
 
 
 def spec_lookup(key: str, engine: str | None = None) -> list[dict[str, Any]]:
-    """Return EXACT values from structured_facts (never computed). Always cite."""
-    raise NotImplementedError
+    """Return EXACT values from structured_facts (never computed). Always cite.
+
+    Matches key with ILIKE (case-insensitive substring). If engine is provided,
+    also filters by row_label or doc_id containing that string.
+    Returns at most 20 rows, each with source_ref for citation.
+    """
+    from config import get_connection
+
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        if engine:
+            cur.execute(
+                """
+                SELECT doc_id, sheet, row_label, col_label, key, value, unit, source_ref
+                FROM structured_facts
+                WHERE key ILIKE %s
+                  AND (row_label ILIKE %s OR doc_id ILIKE %s)
+                LIMIT 20
+                """,
+                (f"%{key}%", f"%{engine}%", f"%{engine}%"),
+            )
+        else:
+            cur.execute(
+                """
+                SELECT doc_id, sheet, row_label, col_label, key, value, unit, source_ref
+                FROM structured_facts
+                WHERE key ILIKE %s
+                LIMIT 20
+                """,
+                (f"%{key}%",),
+            )
+        rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    return [
+        {
+            "doc_id": r[0],
+            "sheet": r[1],
+            "row_label": r[2],
+            "col_label": r[3],
+            "key": r[4],
+            "value": r[5],
+            "unit": r[6],
+            "source_ref": r[7],
+        }
+        for r in rows
+    ]
 
 
 def conflict_check(claim: str) -> list[dict[str, Any]]:

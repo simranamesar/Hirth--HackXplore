@@ -51,10 +51,20 @@ def route(path: str | Path) -> ParsedDoc:
         raise ValueError(f"Unsupported format: {path.suffix}")
 
     if handler == "pdf_or_ocr":
-        from .parsers import pdf_parser
+        from .parsers import pdf_parser, ocr as ocr_parser
         doc = pdf_parser.parse(path)
         if not doc.text.strip():
-            log.warning("route: %s has no extractable text; OCR not available in this slice", path.name)
+            log.info("route: %s has no extractable text; falling back to OCR", path.name)
+            doc = ocr_parser.parse(path)
+    elif handler == "sheet":
+        from .parsers import sheet_parser
+        doc = sheet_parser.parse(path)
+    elif handler == "ocr":
+        from .parsers import ocr as ocr_parser
+        doc = ocr_parser.parse(path)
+    elif handler == "doc_legacy":
+        from .parsers import doc_convert
+        doc = doc_convert.parse(path)
     elif handler == "docx":
         from .parsers import docx_parser
         doc = docx_parser.parse(path)

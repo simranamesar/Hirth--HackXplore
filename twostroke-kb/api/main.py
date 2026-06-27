@@ -47,62 +47,14 @@ async def upload(file: UploadFile = File(...)) -> JSONResponse:
 
 @app.post("/ask")
 async def ask(question: str = Form(...), session_id: str = Form("anon")) -> JSONResponse:
-    """Plain retrieve→answer with citations. Agent loop (Graph 2) wired later.
+    """ReAct agent answer with citations and grounding check.
 
-    Grounding rule: the system prompt forbids inventing numbers not present in sources.
+    Falls back to plain retrieve->answer automatically if the agent graph fails.
     """
-    from agent.retriever_hybrid import search
-    from llm import chat
+    from agent.graph import answer
 
-    chunks = search(question, k=settings.rerank_top_k)
-
-    if not chunks:
-        return JSONResponse({
-            "answer": "I don't have enough information in the knowledge base to answer that question.",
-            "citations": [],
-            "confidence": None,
-            "related_questions": [],
-        })
-
-    # Build numbered context passages
-    context_lines: list[str] = []
-    citations: list[dict] = []
-    for i, c in enumerate(chunks, start=1):
-        source_refs = c.get("source_refs") or [{}]
-        ref = source_refs[0] if source_refs else {}
-        label = ref.get("filename", c.get("doc_id", "unknown"))
-        page = ref.get("page", "")
-        cite_label = f"{label} p.{page}" if page else label
-        context_lines.append(f"[Source {i}] ({cite_label})\n{c['content']}")
-        citations.append({"n": i, "doc_id": c["doc_id"], "filename": label,
-                          "page": page, "snippet": c["content"][:200]})
-
-    context = "\n\n".join(context_lines)
-
-    messages = [
-        {
-            "role": "system",
-            "content": (
-                "You are TwoStrokeGPT, an expert on two-stroke engines. "
-                "Answer ONLY using the numbered sources provided below. "
-                "Cite each fact as [Source N] immediately after the claim. "
-                "If a numeric value (RPM, temperature, timing, torque, etc.) "
-                "is NOT explicitly stated in a source, say you don't know. "
-                "Never invent or estimate a value.\n\n"
-                f"Sources:\n{context}"
-            ),
-        },
-        {"role": "user", "content": question},
-    ]
-
-    answer_text = chat(messages, temperature=0.1, max_tokens=1024)
-
-    return JSONResponse({
-        "answer": answer_text,
-        "citations": citations,
-        "confidence": None,
-        "related_questions": [],
-    })
+    result = answer(question, session_id=session_id)
+    return JSONResponse(result)
 
 
 @app.post("/feedback")

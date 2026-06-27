@@ -99,10 +99,16 @@ def _store_table_facts(cur: Any, doc_id: str, chunk: dict[str, Any]) -> None:
     # First data row is the header (after optional [Table: name] line)
     header: list[str] = []
     data_rows: list[list[str]] = []
+    units_map: dict[str, str] = {}  # col_label -> unit
     for line in lines:
         if line.startswith("[Table:"):
             continue
         if line.startswith("Units:"):
+            # format: "Units: col1=unit1, col2=unit2"
+            for part in line[len("Units:"):].strip().split(","):
+                if "=" in part:
+                    k, v = part.split("=", 1)
+                    units_map[k.strip()] = v.strip()
             continue
         cells = [c.strip() for c in line.split("|")]
         if not header:
@@ -118,11 +124,12 @@ def _store_table_facts(cur: Any, doc_id: str, chunk: dict[str, Any]) -> None:
         for col_idx, value in enumerate(row[1:], start=1):
             col_label = header[col_idx] if col_idx < len(header) else ""
             if value.strip():
+                unit = units_map.get(col_label)
                 cur.execute(
                     """
                     INSERT INTO structured_facts
-                        (doc_id, sheet, row_label, col_label, key, value, source_ref)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb)
+                        (doc_id, sheet, row_label, col_label, key, value, unit, source_ref)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s::jsonb)
                     """,
                     (
                         doc_id,
@@ -131,6 +138,7 @@ def _store_table_facts(cur: Any, doc_id: str, chunk: dict[str, Any]) -> None:
                         col_label,
                         f"{row_label}::{col_label}",
                         value.strip(),
+                        unit,
                         source_ref,
                     ),
                 )
