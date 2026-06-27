@@ -166,14 +166,15 @@ def _plain_answer(question: str) -> dict[str, Any]:
                     "You are TwoStrokeGPT, an expert on two-stroke engines. "
                     "Answer ONLY from the numbered sources below. "
                     "Cite each fact as [Source N]. Never invent numbers. "
-                    "Provide a COMPLETE answer — do not truncate or end mid-sentence.\n\n"
+                    "Write a COMPLETE answer. If you cannot fit everything, "
+                    "summarise remaining points in a short final paragraph — "
+                    "never end mid-sentence.\n\n"
                     + "\n\n".join(context_lines)
                 ),
             },
             {"role": "user", "content": question},
         ],
         temperature=0.1,
-        max_tokens=2048,
     )
 
     return {"draft": answer_text, "citations": citations, "grounded": False, "related": []}

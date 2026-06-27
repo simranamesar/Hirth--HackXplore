@@ -194,7 +194,9 @@ def draft(state: AgentState) -> dict[str, Any]:
                     "If a numeric value (RPM, temperature, timing, torque, etc.) "
                     "is NOT explicitly stated in a source, say you don't know — "
                     "never invent or estimate a value. "
-                    "Provide a COMPLETE answer — do not truncate or end mid-sentence."
+                    "Write a COMPLETE answer. If you cannot fit everything, "
+                    "summarise the remaining points in a short final paragraph — "
+                    "never end mid-sentence."
                     + style_note
                     + lang_note
                     + f"\n\nSources:\n{context}"
@@ -203,7 +205,6 @@ def draft(state: AgentState) -> dict[str, Any]:
             {"role": "user", "content": state["question"]},
         ],
         temperature=0.1,
-        max_tokens=2048,
     )
 
     return {"draft": answer_text, "citations": citations}

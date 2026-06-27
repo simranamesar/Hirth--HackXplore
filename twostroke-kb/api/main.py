@@ -180,7 +180,9 @@ def _stream_answer(
                 "Answer ONLY using the numbered sources below. "
                 "Cite each fact as [Source N] immediately after the claim. "
                 "Never invent or estimate numeric values. "
-                "Provide a COMPLETE answer — do not truncate or end mid-sentence."
+                "Write a COMPLETE answer. If you cannot fit everything, "
+                "summarise remaining points in a short final paragraph — "
+                "never end mid-sentence."
                 + expertise_note
                 + lang_note
                 + ("\n\n" + history_note.strip() if history_note else "")
@@ -193,7 +195,7 @@ def _stream_answer(
 
     full_answer = ""
     try:
-        for token in stream_chat(messages, temperature=0.1, max_tokens=2048):
+        for token in stream_chat(messages, temperature=0.1):
             full_answer += token
             yield _sse({"type": "delta", "text": token})
     except Exception as exc:
@@ -460,17 +462,21 @@ def view_chunk_html(chunk_id: int):
   h2{{font-size:18px;margin-bottom:4px}}
   .meta{{font-size:12px;color:#78716c;margin-bottom:20px}}
   pre{{background:#f5f5f4;border-radius:8px;padding:16px;white-space:pre-wrap;word-break:break-word;line-height:1.6;font-size:14px}}
-  a{{color:#b45309}}
+  a,button.close{{color:#b45309;cursor:pointer;background:none;border:none;font-size:14px;padding:0;text-decoration:underline}}
+  .notice{{font-size:12px;color:#78716c;margin-top:4px}}
 </style></head><body>
 <h2>Chunk #{row[0]} — <code>{row[1]}</code></h2>
 <div class="meta">
   type: {meta.get("chunk_type", meta.get("type","?"))} &nbsp;|&nbsp;
   lang: {meta.get("lang","?")} &nbsp;|&nbsp;
-  sources: {content_escaped[:0] or ref_str}
-  <br>sources: {ref_str}
+  page: {meta.get("page", "?")} &nbsp;|&nbsp;
+  sources: {ref_str}
 </div>
 <pre>{content_escaped}</pre>
-<p><a href="javascript:history.back()">← Back</a></p>
+<p>
+  <button class="close" onclick="window.close()">Close this tab</button>
+  <span class="notice">&nbsp;— opened by TwoStrokeGPT</span>
+</p>
 </body></html>"""
         return HTMLResponse(html)
     except Exception as exc:

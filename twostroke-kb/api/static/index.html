@@ -369,9 +369,9 @@
 
       const cites = (ev.citations || []).map(c => {
         const loc = c.page ? ` p.${c.page}` : "";
-        // Evidence anchor: real URL so "open in new tab" works
+        // Left-click → in-page (Indexed Chunks tab); right-click → new tab via href
         const anchor = c.id
-          ? `<a href="/chunks/${c.id}/view" target="_blank" rel="noopener">View source ↗</a>`
+          ? `<a href="/chunks/${c.id}/view" onclick="viewChunk(${c.id});return false">View source ↗</a>`
           : "";
         return `<div class="cite">
           <strong>[${c.n}]</strong> ${c.filename || c.doc_id}${loc} ${anchor}<br>
