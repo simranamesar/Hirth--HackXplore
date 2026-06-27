@@ -18,3 +18,4 @@ data/
 .DS_Store
 *.swp
 Thumbs.db
+.env
