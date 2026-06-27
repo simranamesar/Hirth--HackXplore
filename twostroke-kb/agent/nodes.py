@@ -17,6 +17,7 @@ except ImportError:
 class AgentState(TypedDict):
     question: str
     lang: str
+    expertise: str                  # "beginner" | "expert" — controls answer verbosity
     scratch: list[dict[str, Any]]   # accumulated tool call results
     tool_action: str | None         # "hybrid_search" | "spec_lookup" | "answer"
     tool_args: dict[str, Any]       # args for the next tool call
@@ -109,6 +110,16 @@ def act(state: AgentState) -> dict[str, Any]:
         results = TOOLS[tool_name](**args)
         if not isinstance(results, list):
             results = [results]
+
+        # Transparently rerank after hybrid_search so downstream nodes always
+        # see the highest-quality results first.
+        if tool_name == "hybrid_search" and results:
+            try:
+                from agent.reranker import rerank
+                query = args.get("query") or state["question"]
+                results = rerank(query, results)
+            except Exception:
+                pass  # reranker unavailable — dense-only ranking is fine
     except NotImplementedError:
         results = [{"content": f"Tool '{tool_name}' is not yet implemented.", "error": True}]
     except Exception as exc:
@@ -163,6 +174,15 @@ def draft(state: AgentState) -> dict[str, Any]:
     lang_note = f" Answer in {lang}." if lang not in ("en", "unknown", "") else ""
     context = "\n\n".join(context_lines)
 
+    expertise = state.get("expertise", "expert")
+    if expertise == "beginner":
+        style_note = (
+            " Use plain, jargon-free language. Define technical terms when you use them. "
+            "Structure your answer with short paragraphs."
+        )
+    else:
+        style_note = " Be concise and technical."
+
     answer_text = chat(
         [
             {
@@ -174,6 +194,7 @@ def draft(state: AgentState) -> dict[str, Any]:
                     "If a numeric value (RPM, temperature, timing, torque, etc.) "
                     "is NOT explicitly stated in a source, say you don't know — "
                     "never invent or estimate a value."
+                    + style_note
                     + lang_note
                     + f"\n\nSources:\n{context}"
                 ),
@@ -204,28 +225,11 @@ def verify(state: AgentState) -> dict[str, Any]:
     if not grounded and state["loops"] >= _MAX_LOOPS:
         v.log_gap(state["question"], "weak evidence: verifier could not ground all numeric claims")
 
-    # Related questions (best-effort; never block on failure)
-    related: list[str] = []
-    if context:
-        try:
-            from llm import chat_json
+    # Related questions via recommender (graph neighbours + LLM; best-effort)
+    try:
+        from agent.recommender import related as get_related
+        related_qs = get_related(state["question"], context)
+    except Exception:
+        related_qs = []
 
-            raw = chat_json(
-                [
-                    {
-                        "role": "system",
-                        "content": (
-                            "Suggest 2–3 concise follow-up questions a two-stroke engine "
-                            "technician might ask after this query. Return a JSON array of strings."
-                        ),
-                    },
-                    {"role": "user", "content": state["question"]},
-                ],
-                max_tokens=150,
-            )
-            if isinstance(raw, list):
-                related = [str(q) for q in raw[:3]]
-        except Exception:
-            pass
-
-    return {"grounded": grounded, "related": related}
+    return {"grounded": grounded, "related": related_qs}

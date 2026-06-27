@@ -60,10 +60,15 @@ def _build_graph():
     return g.compile()
 
 
-def answer(question: str, session_id: str = "anon") -> dict[str, Any]:
+def answer(
+    question: str,
+    session_id: str = "anon",
+    expertise: str = "expert",
+) -> dict[str, Any]:
     """Run the ReAct agent and return {answer, citations, confidence, related_questions}.
 
     Falls back to the plain retrieve->answer path if the graph raises.
+    expertise: "beginner" | "expert" — controls answer verbosity and jargon level.
     """
     global _graph
     if _graph is None:
@@ -74,6 +79,7 @@ def answer(question: str, session_id: str = "anon") -> dict[str, Any]:
     initial: AgentState = {
         "question": question,
         "lang": detect_language(question),
+        "expertise": expertise,
         "scratch": [],
         "tool_action": None,
         "tool_args": {},
