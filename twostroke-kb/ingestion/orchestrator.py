@@ -110,7 +110,7 @@ def run_ingestion(path: str | Path) -> IngestResult:
 
     # 9. Graph extraction (best-effort; LLM failure → skip silently)
     try:
-        graph_builder.extract(clean)
+        graph_builder.extract(clean, chunks=chunks)
     except Exception:
         log.warning("orchestrator: graph_builder failed for %s; continuing", path.name)
 

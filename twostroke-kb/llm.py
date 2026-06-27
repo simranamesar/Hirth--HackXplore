@@ -67,7 +67,13 @@ def chat(
     msgs = _maybe_no_think(messages)
 
     if provider in ("openai", "local", "ollama", "vllm"):
-        raw = _openai_compat(msgs, _temp, _maxt, _model, cfg)
+        try:
+            raw = _openai_compat(msgs, _temp, _maxt, _model, cfg)
+        except Exception:
+            if provider in ("local", "ollama", "vllm"):
+                raw = _offline_extractive(msgs)
+            else:
+                raise
     elif provider == "anthropic":
         raw = _anthropic(msgs, _temp, _maxt, _model, cfg)
     else:
@@ -135,7 +141,13 @@ def stream_chat(
     msgs = _maybe_no_think(messages)
 
     if provider in ("openai", "local", "ollama", "vllm"):
-        yield from _openai_compat_stream(msgs, _temp, _maxt, _model, cfg, _no_think)
+        try:
+            yield from _openai_compat_stream(msgs, _temp, _maxt, _model, cfg, _no_think)
+        except Exception:
+            if provider not in ("local", "ollama", "vllm"):
+                raise
+            for token in _offline_extractive(msgs).split(" "):
+                yield token + " "
     elif provider == "anthropic":
         yield from _anthropic_stream(msgs, _temp, _maxt, _model, cfg, _no_think)
     else:
@@ -201,6 +213,76 @@ def _anthropic_stream(messages, temperature, max_tokens, model, cfg, no_think) -
     ) as s:
         for tok in s.text_stream:
             yield tok
+
+
+def _offline_extractive(messages: list[Message]) -> str:
+    """Conservative local fallback for demos when Ollama is not running."""
+    system = "\n\n".join(m["content"] for m in messages if m["role"] == "system")
+    user = "\n".join(m["content"] for m in messages if m["role"] == "user")
+
+    if "Available tools" in system:
+        return json.dumps({
+            "thought": "Search uploaded documents for grounded evidence.",
+            "action": "hybrid_search",
+            "args": {"query": user.replace("Question:", "").strip()},
+        })
+
+    sources = _extract_numbered_sources(system)
+    if not sources:
+        return "I don't have enough information in the uploaded documents to answer that question."
+
+    terms = _keywords(user)
+    ranked = sorted(sources, key=lambda s: _overlap_score(terms, s["text"]), reverse=True)
+    selected = [s for s in ranked if _overlap_score(terms, s["text"]) > 0][:3] or ranked[:2]
+    lines = []
+    for source in selected:
+        sentence = _best_sentence(source["text"], terms)
+        if sentence:
+            lines.append(f"{sentence} [Source {source['n']}]")
+
+    if not lines:
+        return "I found relevant uploaded sources, but not enough clear text to answer confidently."
+    return "From the uploaded documents, the relevant point is:\n\n" + "\n".join(
+        f"- {line}" for line in lines
+    )
+
+
+def _extract_numbered_sources(text: str) -> list[dict[str, str]]:
+    pattern = re.compile(
+        r"\[Source\s+(\d+)\]\s*(?:\([^)]+\))?\s*\n(.*?)(?=\n\s*\[Source\s+\d+\]|\Z)",
+        re.S,
+    )
+    return [{"n": m.group(1), "text": _clean_space(m.group(2))} for m in pattern.finditer(text)]
+
+
+def _keywords(text: str) -> set[str]:
+    words = re.findall(r"[A-Za-zÄÖÜäöüß0-9][A-Za-zÄÖÜäöüß0-9_.-]{2,}", text.lower())
+    stop = {
+        "the", "and", "for", "what", "does", "about", "with", "from", "that",
+        "this", "how", "are", "ist", "und", "der", "die", "das", "was",
+        "sample", "document", "documents", "uploaded",
+    }
+    return {word for word in words if word not in stop}
+
+
+def _overlap_score(query_terms: set[str], text: str) -> int:
+    text_l = text.lower()
+    return sum(1 for term in query_terms if term in text_l)
+
+
+def _best_sentence(text: str, query_terms: set[str]) -> str:
+    sentences = re.split(r"(?<=[.!?])\s+|\n+", text)
+    candidates = [_clean_space(sentence) for sentence in sentences if _clean_space(sentence)]
+    if not candidates:
+        return _clean_space(text[:280])
+    best = max(candidates, key=lambda s: (_overlap_score(query_terms, s), min(len(s), 280)))
+    if len(best) > 360:
+        best = best[:357].rstrip() + "..."
+    return best
+
+
+def _clean_space(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip()
 
 
 # --- vision ------------------------------------------------------------------
