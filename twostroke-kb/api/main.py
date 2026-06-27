@@ -843,6 +843,102 @@ def graph_diagnostic_paths(query: str, limit: int = 5) -> JSONResponse:
         return JSONResponse({"query": query, "paths": [], "error": str(exc)}, status_code=500)
 
 
+@app.get("/graph/quality")
+def graph_quality() -> JSONResponse:
+    """Return KG quality metrics: node/edge counts, confidence, evidence coverage."""
+    from config import get_connection
+    import json as _j
+
+    try:
+        conn = get_connection()
+        try:
+            cur = conn.cursor()
+
+            cur.execute("SELECT COUNT(*) FROM graph_nodes")
+            total_nodes = cur.fetchone()[0]
+
+            cur.execute("SELECT COUNT(*) FROM graph_edges")
+            total_edges = cur.fetchone()[0]
+
+            cur.execute("SELECT type, COUNT(*) FROM graph_nodes GROUP BY type ORDER BY COUNT(*) DESC")
+            nodes_by_type = {r[0]: r[1] for r in cur.fetchall()}
+
+            cur.execute("SELECT relation, COUNT(*) FROM graph_edges GROUP BY relation ORDER BY COUNT(*) DESC")
+            edges_by_relation = {r[0]: r[1] for r in cur.fetchall()}
+
+            # Props-based stats — safe against NULL props
+            cur.execute("SELECT props FROM graph_edges WHERE props IS NOT NULL")
+            edge_props_rows = cur.fetchall()
+
+            method_counts: dict = {}
+            confidences: list[float] = []
+            with_evidence = 0
+            with_doc_id = 0
+            with_chunk_id = 0
+
+            for (props_raw,) in edge_props_rows:
+                props = props_raw if isinstance(props_raw, dict) else _j.loads(props_raw or "{}")
+                method = str(props.get("extraction_method") or "unknown")
+                method_counts[method] = method_counts.get(method, 0) + 1
+                conf = props.get("confidence")
+                try:
+                    confidences.append(float(conf))
+                except (TypeError, ValueError):
+                    pass
+                if props.get("evidence"):
+                    with_evidence += 1
+                if props.get("doc_id"):
+                    with_doc_id += 1
+                if props.get("source_chunk_id") or props.get("chunk_id"):
+                    with_chunk_id += 1
+
+            avg_confidence = round(sum(confidences) / len(confidences), 3) if confidences else None
+            edge_total = len(edge_props_rows)
+            evidence_pct  = round(with_evidence / edge_total * 100, 1) if edge_total else 0
+            doc_id_pct    = round(with_doc_id   / edge_total * 100, 1) if edge_total else 0
+            chunk_id_pct  = round(with_chunk_id / edge_total * 100, 1) if edge_total else 0
+
+            # Top connected nodes
+            cur.execute("""
+                SELECT n.name, n.type, COUNT(*) AS degree
+                FROM graph_nodes n
+                JOIN graph_edges e ON e.src_id = n.id OR e.dst_id = n.id
+                GROUP BY n.id, n.name, n.type
+                ORDER BY degree DESC LIMIT 10
+            """)
+            top_connected = [{"name": r[0], "type": r[1], "degree": r[2]} for r in cur.fetchall()]
+
+            # Unknown / noisy nodes
+            cur.execute("SELECT name FROM graph_nodes WHERE type = 'unknown' LIMIT 10")
+            noisy_unknown = [r[0] for r in cur.fetchall()]
+
+        finally:
+            conn.close()
+
+        return JSONResponse({
+            "total_nodes": total_nodes,
+            "total_edges": total_edges,
+            "nodes_by_type": nodes_by_type,
+            "edges_by_relation": edges_by_relation,
+            "edges_by_extraction_method": method_counts,
+            "avg_confidence": avg_confidence,
+            "evidence_coverage_pct": evidence_pct,
+            "doc_id_coverage_pct": doc_id_pct,
+            "chunk_id_coverage_pct": chunk_id_pct,
+            "top_connected_nodes": top_connected,
+            "noisy_unknown_nodes": noisy_unknown,
+        })
+    except Exception as exc:
+        return JSONResponse({
+            "total_nodes": 0, "total_edges": 0,
+            "nodes_by_type": {}, "edges_by_relation": {},
+            "edges_by_extraction_method": {}, "avg_confidence": None,
+            "evidence_coverage_pct": 0, "doc_id_coverage_pct": 0,
+            "chunk_id_coverage_pct": 0, "top_connected_nodes": [],
+            "noisy_unknown_nodes": [], "error": str(exc),
+        })
+
+
 if __name__ == "__main__":
     import uvicorn
 

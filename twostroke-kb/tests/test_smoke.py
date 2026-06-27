@@ -133,8 +133,9 @@ def test_chunker_splits_prose():
     prose_chunks = [c for c in chunks if c["metadata"]["chunk_type"] == "prose"]
     assert len(prose_chunks) >= 3
     for c in prose_chunks:
-        assert len(c["content"]) <= 700
-        assert c["source_refs"] == [{"filename": "test.txt"}]
+        assert len(c["content"]) <= 850  # chunker may extend to sentence boundary (+150)
+        ref = c["source_refs"][0]
+        assert ref["filename"] == "test.txt"  # page key may also be present
 
 
 def test_chunker_preserves_tables():

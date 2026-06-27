@@ -168,6 +168,32 @@
     .fbar.done i{background:var(--grn)}
     .fchunks{font-family:var(--mono);font-size:11px;color:var(--tx2);flex:none}
 
+    /* ── Diagnostic path cards ── */
+    .diag-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+    .diag-path{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;font-size:13px;font-weight:600}
+    .diag-arrow{color:var(--tx3);font-family:var(--mono)}
+    .diag-node{padding:4px 9px;border-radius:7px;font-size:12px;font-weight:600;font-family:var(--mono)}
+    .diag-node.symptom{background:#f0a83014;color:var(--amb);border:1px solid #f0a83033}
+    .diag-node.cause{background:#e5484d14;color:#ff9483;border:1px solid #e5484d33}
+    .diag-node.fix{background:#3fd07a14;color:var(--grn);border:1px solid #3fd07a33}
+    .diag-node.part{background:#ffffff08;color:var(--tx2);border:1px solid var(--line2)}
+    .diag-meta{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-family:var(--mono);font-size:10.5px;color:var(--tx3)}
+    .diag-conf{display:flex;align-items:center;gap:6px}
+    .diag-bar{width:60px;height:4px;background:var(--ins);border-radius:2px;overflow:hidden}
+    .diag-bar i{display:block;height:100%;background:var(--grn)}
+    .diag-evidence{margin-top:8px;font-size:12px;color:var(--tx2);line-height:1.45;border-left:2px solid var(--line2);padding-left:8px;font-style:italic}
+    /* ── KG quality stats ── */
+    .kg-stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:14px}
+    .kg-stat{background:var(--ins);border:1px solid var(--line);border-radius:9px;padding:11px 13px}
+    .kg-stat-n{font-family:'Saira';font-weight:700;font-size:22px;color:var(--grn)}
+    .kg-stat-l{font-family:var(--mono);font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--tx3);margin-top:3px}
+    .kg-breakdown{display:flex;flex-direction:column;gap:5px;margin-top:10px}
+    .kg-row{display:flex;align-items:center;gap:8px;font-size:12px}
+    .kg-row .k{font-family:var(--mono);font-size:10px;color:var(--tx3);min-width:120px;text-transform:uppercase;letter-spacing:.05em}
+    .kg-row .bar{flex:1;height:5px;background:var(--ins);border-radius:2px;overflow:hidden}
+    .kg-row .bar i{display:block;height:100%;background:var(--grn);border-radius:2px}
+    .kg-row .v{font-family:var(--mono);font-size:10.5px;color:var(--tx2);min-width:30px;text-align:right}
+
     /* ── Chunk inspector ── */
     #chunkList{max-height:320px;overflow-y:auto}
     .chunk-row{padding:9px 10px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px;border-radius:6px;transition:.1s}
@@ -477,6 +503,35 @@
               <span style="color:#3fd07a99">●</span> fix
             </div>
           </div>
+
+          <!-- ── Diagnostic Path Search ── -->
+          <div class="card" style="margin-top:14px">
+            <div class="sect">Diagnostic Path Search
+              <span class="lbl" style="margin-left:auto">Symptom → Cause → Fix</span>
+            </div>
+            <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+              <input type="text" id="diagQuery" placeholder="e.g. misfire, overheating, won't start…" style="flex:1;min-width:200px" onkeydown="if(event.key==='Enter') searchDiagnostic()"/>
+              <button class="btn sm pri" onclick="searchDiagnostic()">Search →</button>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+              <span class="rel-chip" onclick="searchDiagnosticQuery('Misfire')">Misfire</span>
+              <span class="rel-chip" onclick="searchDiagnosticQuery('Overheating')">Overheating</span>
+              <span class="rel-chip" onclick="searchDiagnosticQuery('Won\'t Start')">Won't Start</span>
+              <span class="rel-chip" onclick="searchDiagnosticQuery('Rough Idle')">Rough Idle</span>
+              <span class="rel-chip" onclick="searchDiagnosticQuery('Loss of Power')">Loss of Power</span>
+              <span class="rel-chip" onclick="searchDiagnosticQuery('Hard Starting')">Hard Starting</span>
+            </div>
+            <div id="diagResults"><span class="muted">Enter a symptom to see diagnostic paths from the knowledge graph.</span></div>
+          </div>
+
+          <!-- ── KG Quality Stats ── -->
+          <div class="card" style="margin-top:14px">
+            <div class="sect">KG Quality
+              <button class="btn sm" style="margin-left:auto" onclick="loadKgQuality()">Refresh</button>
+            </div>
+            <div id="kgQualityContent"><span class="muted">Click Refresh to load knowledge graph quality metrics.</span></div>
+          </div>
+
         </div>
       </div>
 
@@ -1233,6 +1288,107 @@
       html += "</div></div>";
     }
     el.innerHTML = html;
+  }
+
+  // ── Diagnostic paths ─────────────────────────────────────────────────
+  function searchDiagnosticQuery(q) {
+    document.getElementById("diagQuery").value = q;
+    searchDiagnostic();
+  }
+
+  async function searchDiagnostic() {
+    const q = document.getElementById("diagQuery").value.trim();
+    const el = document.getElementById("diagResults");
+    if (!q) { el.innerHTML = '<span class="muted">Enter a symptom to search.</span>'; return; }
+    el.innerHTML = '<span class="spinner"></span>';
+    try {
+      const r = await fetch(`/graph/diagnostic-paths?query=${encodeURIComponent(q)}&limit=8`);
+      const j = await r.json();
+      _renderDiagnosticPaths(j, el);
+    } catch (e) {
+      el.innerHTML = `<span class="muted">Error: ${e.message}</span>`;
+    }
+  }
+
+  function _renderDiagnosticPaths(j, el) {
+    const paths = j.paths || [];
+    if (!paths.length) {
+      el.innerHTML = `<p class="muted">No diagnostic paths found for "<strong>${j.query||''}</strong>".<br>
+        The seed ontology populates on first ingest. Upload a document to enrich with document-backed paths.</p>`;
+      return;
+    }
+    el.innerHTML = paths.map(p => {
+      const parts = (p.path || "").split(/\s+--[^-]+-+>\s*/);
+      const relations = [...(p.path || "").matchAll(/--([^-]+)-->/g)].map(m => m[1]);
+      const nodeHtml = parts.map((part, i) => {
+        const nodeType = _guessNodeType(part, i, parts.length);
+        const arrow = i < relations.length ? `<span class="diag-arrow">──${relations[i]}──▶</span>` : "";
+        return `<span class="diag-node ${nodeType}">${part}</span>${arrow}`;
+      }).join(" ");
+      const conf = p.confidence != null ? parseFloat(p.confidence) : null;
+      const confHtml = conf != null
+        ? `<span class="diag-conf"><div class="diag-bar"><i style="width:${Math.round(conf*100)}%"></i></div>${(conf*100).toFixed(0)}%</span>`
+        : "";
+      const src = p.source_title ? `<span>📄 ${p.source_title}${p.page ? ` p.${p.page}` : ""}</span>` : "";
+      const method = p.extraction_method ? `<span>${p.extraction_method}</span>` : "";
+      const evidence = p.evidence ? `<div class="diag-evidence">"${p.evidence.slice(0,200)}${p.evidence.length>200?'…':''}"</div>` : "";
+      return `<div class="diag-card">
+        <div class="diag-path">${nodeHtml}</div>
+        <div class="diag-meta">${confHtml}${src}${method}</div>
+        ${evidence}
+      </div>`;
+    }).join("");
+  }
+
+  function _guessNodeType(label, idx, total) {
+    const l = label.toLowerCase();
+    if (idx === 0) return "symptom";
+    if (idx === total - 1) return "fix";
+    if (/fouling|leak|weak|block|restriction|compression|timing|buildup/.test(l)) return "cause";
+    if (/spark|carb|filter|pump|piston|cylinder|fan|coil|valve|sensor|ring|shaft/.test(l)) return "part";
+    return "cause";
+  }
+
+  // ── KG Quality ───────────────────────────────────────────────────────
+  async function loadKgQuality() {
+    const el = document.getElementById("kgQualityContent");
+    el.innerHTML = '<span class="spinner"></span>';
+    try {
+      const r = await fetch("/graph/quality");
+      const j = await r.json();
+      _renderKgQuality(j, el);
+    } catch (e) {
+      el.innerHTML = `<span class="muted">Error: ${e.message}</span>`;
+    }
+  }
+
+  function _renderKgQuality(j, el) {
+    if (j.error && !j.total_nodes) {
+      el.innerHTML = `<p class="muted">KG quality unavailable: ${j.error}</p>`; return;
+    }
+    const maxEdges = Math.max(...Object.values(j.edges_by_relation||{1:1}), 1);
+    const maxNodes = Math.max(...Object.values(j.nodes_by_type||{1:1}), 1);
+    const maxMethods = Math.max(...Object.values(j.edges_by_extraction_method||{1:1}), 1);
+    const nodeRows = Object.entries(j.nodes_by_type||{}).map(([k,v]) =>
+      `<div class="kg-row"><span class="k">${k}</span><div class="bar"><i style="width:${Math.round(v/maxNodes*100)}%"></i></div><span class="v">${v}</span></div>`).join("");
+    const edgeRows = Object.entries(j.edges_by_relation||{}).slice(0,8).map(([k,v]) =>
+      `<div class="kg-row"><span class="k">${k}</span><div class="bar"><i style="width:${Math.round(v/maxEdges*100)}%"></i></div><span class="v">${v}</span></div>`).join("");
+    const methodRows = Object.entries(j.edges_by_extraction_method||{}).map(([k,v]) =>
+      `<div class="kg-row"><span class="k">${k}</span><div class="bar"><i style="width:${Math.round(v/maxMethods*100)}%"></i></div><span class="v">${v}</span></div>`).join("");
+    el.innerHTML = `
+      <div class="kg-stats-grid">
+        <div class="kg-stat"><div class="kg-stat-n">${j.total_nodes}</div><div class="kg-stat-l">Nodes</div></div>
+        <div class="kg-stat"><div class="kg-stat-n">${j.total_edges}</div><div class="kg-stat-l">Edges</div></div>
+        <div class="kg-stat"><div class="kg-stat-n" style="color:${j.avg_confidence>=.8?'var(--grn)':'var(--amb)'}">${j.avg_confidence!=null?(j.avg_confidence*100).toFixed(0)+'%':'—'}</div><div class="kg-stat-l">Avg Confidence</div></div>
+        <div class="kg-stat"><div class="kg-stat-n">${j.evidence_coverage_pct}%</div><div class="kg-stat-l">Evidence Coverage</div></div>
+        <div class="kg-stat"><div class="kg-stat-n">${j.doc_id_coverage_pct}%</div><div class="kg-stat-l">Source Linked</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px">
+        <div><div class="lbl" style="margin-bottom:6px">Nodes by type</div><div class="kg-breakdown">${nodeRows||'<span class="muted">—</span>'}</div></div>
+        <div><div class="lbl" style="margin-bottom:6px">Edges by relation</div><div class="kg-breakdown">${edgeRows||'<span class="muted">—</span>'}</div></div>
+        <div><div class="lbl" style="margin-bottom:6px">Extraction methods</div><div class="kg-breakdown">${methodRows||'<span class="muted">—</span>'}</div></div>
+      </div>
+      ${j.noisy_unknown_nodes&&j.noisy_unknown_nodes.length?`<div style="margin-top:12px"><div class="lbl" style="margin-bottom:6px">⚠ Unknown/noisy nodes</div><div style="font-family:var(--mono);font-size:11px;color:var(--tx3)">${j.noisy_unknown_nodes.join(', ')}</div></div>`:''}`;
   }
 
   // ── Gaps ──────────────────────────────────────────────────────────────
