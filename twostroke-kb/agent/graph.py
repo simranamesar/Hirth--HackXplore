@@ -76,8 +76,28 @@ def answer(
 
     from ingestion.format_router import detect_language
 
+    # Load prior conversation turns for context
+    history_note = ""
+    try:
+        from memory.store import get_conversation
+        turns = get_conversation(session_id)
+        if turns:
+            # Summarise the last 4 turns (2 exchanges) as a context note
+            recent = turns[-4:]
+            history_parts = []
+            for t in recent:
+                role = t.get("role", "")
+                content = str(t.get("content", ""))[:300]
+                history_parts.append(f"{role.capitalize()}: {content}")
+            history_note = "\n\nPrior conversation:\n" + "\n".join(history_parts)
+    except Exception:
+        pass
+
+    # Append history context to question so the agent is aware of prior turns
+    question_with_context = question + history_note if history_note else question
+
     initial: AgentState = {
-        "question": question,
+        "question": question_with_context,
         "lang": detect_language(question),
         "expertise": expertise,
         "scratch": [],
@@ -145,14 +165,16 @@ def _plain_answer(question: str) -> dict[str, Any]:
                 "content": (
                     "You are TwoStrokeGPT, an expert on two-stroke engines. "
                     "Answer ONLY from the numbered sources below. "
-                    "Cite each fact as [Source N]. Never invent numbers.\n\n"
+                    "Cite each fact as [Source N]. Never invent numbers. "
+                    "Write a COMPLETE answer. If you cannot fit everything, "
+                    "summarise remaining points in a short final paragraph — "
+                    "never end mid-sentence.\n\n"
                     + "\n\n".join(context_lines)
                 ),
             },
             {"role": "user", "content": question},
         ],
         temperature=0.1,
-        max_tokens=1024,
     )
 
     return {"draft": answer_text, "citations": citations, "grounded": False, "related": []}

@@ -18,3 +18,6 @@ data/
 .DS_Store
 *.swp
 Thumbs.db
+.env
+*.pid
+*.log

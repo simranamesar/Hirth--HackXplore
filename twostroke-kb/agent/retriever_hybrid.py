@@ -32,9 +32,11 @@ def search(query: str, k: int | None = None) -> list[dict[str, Any]]:
         sparse = []
 
     if not sparse:
-        return dense[:top_k]
+        results = dense[:top_k]
+    else:
+        results = _rrf_fuse(dense, sparse, top_k)
 
-    return _rrf_fuse(dense, sparse, top_k)
+    return _apply_feedback_boost(results)
 
 
 # ---------------------------------------------------------------------------
@@ -135,6 +137,60 @@ def _rrf_fuse(
         fused[cid]["score"] += 1.0 / (_RRF_K + rank + 1)
 
     return sorted(fused.values(), key=lambda c: c["score"], reverse=True)[:top_k]
+
+
+# ---------------------------------------------------------------------------
+# Feedback boost
+# ---------------------------------------------------------------------------
+
+def _apply_feedback_boost(chunks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Re-score chunks using accumulated vote totals from the feedback table.
+
+    vote_sum > 0 → small upward nudge; vote_sum < 0 → small downward nudge.
+    Boost is intentionally mild (±10% max) so retrieval relevance still dominates.
+    Returns list re-sorted by boosted score descending.
+    """
+    if not chunks:
+        return chunks
+
+    chunk_ids = [int(c["id"]) for c in chunks]
+    vote_map: dict[int, int] = _fetch_vote_totals(chunk_ids)
+    if not vote_map:
+        return chunks
+
+    for c in chunks:
+        votes = vote_map.get(int(c["id"]), 0)
+        # clamp multiplier: max ±10% adjustment
+        multiplier = 1.0 + max(-0.10, min(0.10, votes * 0.02))
+        c["score"] = c.get("score", 0.0) * multiplier
+
+    return sorted(chunks, key=lambda c: c["score"], reverse=True)
+
+
+def _fetch_vote_totals(chunk_ids: list[int]) -> dict[int, int]:
+    """Return {chunk_id: sum(vote)} for chunks that appear in the feedback table."""
+    try:
+        from config import get_connection
+
+        conn = get_connection()
+        try:
+            cur = conn.cursor()
+            # feedback.chunk_ids is BIGINT[]; unnest to join
+            cur.execute(
+                """
+                SELECT unnested_id, SUM(vote)
+                FROM feedback, UNNEST(chunk_ids) AS unnested_id
+                WHERE unnested_id = ANY(%s)
+                GROUP BY unnested_id
+                """,
+                (chunk_ids,),
+            )
+            return {int(row[0]): int(row[1]) for row in cur.fetchall()}
+        finally:
+            conn.close()
+    except Exception:
+        log.debug("retriever_hybrid: could not fetch vote totals; skipping boost")
+        return {}
 
 
 # ---------------------------------------------------------------------------

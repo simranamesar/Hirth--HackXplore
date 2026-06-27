@@ -1,4 +1,9 @@
-"""Digital PDF -> text + layout, with page/section metadata. Backend: PyMuPDF."""
+"""Digital PDF → text with per-page sentinels for page-number tracking.
+
+Each page boundary is marked with [PAGE_BREAK:N] (1-based).
+The chunker strips these sentinels and uses them to record which page
+each chunk came from in source_refs[0]["page"].
+"""
 from __future__ import annotations
 
 import logging
@@ -12,9 +17,11 @@ log = logging.getLogger(__name__)
 
 
 def parse(path: str | Path) -> ParsedDoc:
-    """Extract text per page. Returns ParsedDoc with text="" for scanned PDFs.
+    """Extract text per page, inserting [PAGE_BREAK:N] sentinels between pages.
 
-    Caller checks doc.text.strip() == "" to decide whether to fall back to OCR.
+    Returns ParsedDoc with text="" for scanned PDFs (caller falls back to OCR).
+    The sentinel format is: \\n\\n[PAGE_BREAK:N]\\n\\n
+    The chunker uses these markers to attach page numbers to each chunk.
     """
     path = Path(path)
     doc = fitz.open(path)
@@ -23,7 +30,17 @@ def parse(path: str | Path) -> ParsedDoc:
         pages_text.append(page.get_text())
     doc.close()
 
-    full_text = "\n".join(pages_text)
+    # Join pages with sentinels so chunker can track page numbers
+    # Page 1 is implicit (no leading sentinel); sentinels mark where page N begins
+    if pages_text:
+        parts: list[str] = [pages_text[0]]
+        for i, page_text in enumerate(pages_text[1:], start=2):
+            parts.append(f"\n\n[PAGE_BREAK:{i}]\n\n")
+            parts.append(page_text)
+        full_text = "".join(parts)
+    else:
+        full_text = ""
+
     if not full_text.strip():
         log.warning("pdf_parser: no extractable text in %s (scanned?)", path.name)
 
