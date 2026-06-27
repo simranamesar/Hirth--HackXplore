@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TwoStrokeGPT</title>
+  <style>
+    :root { --fg:#1c1917; --muted:#78716c; --bg:#fafaf9; --card:#fff; --border:#e7e5e4; --accent:#b45309; }
+    * { box-sizing: border-box; }
+    body { font-family: ui-sans-serif, system-ui, sans-serif; margin:0; background:var(--bg); color:var(--fg); }
+    header { padding:16px 24px; border-bottom:1px solid var(--border); font-weight:700; }
+    main { max-width:820px; margin:0 auto; padding:24px; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:16px; }
+    .row { display:flex; gap:8px; }
+    input[type=text]{ flex:1; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:14px; }
+    button{ padding:10px 16px; border:0; border-radius:8px; background:var(--accent); color:#fff; font-weight:600; cursor:pointer; }
+    button.secondary{ background:#f5f5f4; color:var(--fg); border:1px solid var(--border); }
+    .muted{ color:var(--muted); font-size:13px; }
+    #answer{ white-space:pre-wrap; }
+    .cite{ font-size:12px; color:var(--muted); border-left:3px solid var(--accent); padding-left:8px; margin-top:6px; }
+  </style>
+</head>
+<body>
+  <header>TwoStrokeGPT — two-stroke knowledge assistant</header>
+  <main>
+    <div class="card">
+      <strong>1 · Upload a document</strong>
+      <p class="muted">PDF · scanned PDF · DOCX · DOC · XLSX · CSV · PPTX · images · .url</p>
+      <div class="row">
+        <input type="file" id="file" />
+        <button onclick="upload()">Upload</button>
+      </div>
+      <div id="uploadStatus" class="muted"></div>
+    </div>
+
+    <div class="card">
+      <strong>2 · Ask a question (EN / DE)</strong>
+      <div class="row" style="margin-top:8px">
+        <input type="text" id="q" placeholder="z. B. Warum überhitzt mein Hirth 3503 in der Höhe?" />
+        <button onclick="ask()">Ask</button>
+      </div>
+      <div id="answer" style="margin-top:12px"></div>
+      <div id="citations"></div>
+      <div id="related" class="muted" style="margin-top:8px"></div>
+      <div class="row" id="fb" style="margin-top:10px; display:none">
+        <button class="secondary" onclick="feedback(1)">👍 Helpful</button>
+        <button class="secondary" onclick="feedback(-1)">👎 Not right</button>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const SID = "web-" + Math.random().toString(36).slice(2);
+    let last = { q: "", a: "" };
+
+    async function upload() {
+      const f = document.getElementById("file").files[0];
+      if (!f) return;
+      const status = document.getElementById("uploadStatus");
+      status.textContent = "Uploading & ingesting…";
+      const fd = new FormData(); fd.append("file", f);
+      const r = await fetch("/upload", { method: "POST", body: fd });
+      const j = await r.json();
+      status.textContent = j.note || (j.filename + " — " + (j.chunks ?? "saved"));
+    }
+
+    async function ask() {
+      const q = document.getElementById("q").value.trim();
+      if (!q) return;
+      document.getElementById("answer").textContent = "Thinking…";
+      const fd = new FormData(); fd.append("question", q); fd.append("session_id", SID);
+      const r = await fetch("/ask", { method: "POST", body: fd });
+      const j = await r.json();
+      last = { q, a: j.answer };
+      document.getElementById("answer").textContent = j.answer;
+      document.getElementById("citations").innerHTML =
+        (j.citations || []).map(c => `<div class="cite">${c.label || JSON.stringify(c)}</div>`).join("");
+      document.getElementById("related").textContent =
+        (j.related_questions || []).length ? "Related: " + j.related_questions.join("  ·  ") : "";
+      document.getElementById("fb").style.display = "flex";
+    }
+
+    async function feedback(vote) {
+      const fd = new FormData();
+      fd.append("session_id", SID); fd.append("question", last.q);
+      fd.append("answer", last.a); fd.append("vote", vote);
+      await fetch("/feedback", { method: "POST", body: fd });
+      document.getElementById("fb").innerHTML = '<span class="muted">Thanks — feedback recorded.</span>';
+    }
+  </script>
+</body>
+</html>
