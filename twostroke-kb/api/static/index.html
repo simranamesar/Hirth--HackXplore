@@ -59,10 +59,8 @@
     .segb{font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--tx2);padding:5px 10px;border-radius:6px;cursor:pointer;border:none;background:transparent;text-transform:uppercase;transition:.1s}
     .segb.on{background:var(--panel2);color:var(--tx);box-shadow:inset 0 0 0 1px var(--line2)}
     .segb.on.acc{color:var(--grn)}
-    .upload-pill{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:var(--tx2);background:var(--panel);border:1px solid var(--line);padding:5px 10px;border-radius:7px;cursor:pointer;position:relative}
-    .upload-pill input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
-    .upload-pill:hover{border-color:var(--line2);color:var(--tx)}
-    #uploadStatus{font-family:var(--mono);font-size:11px;color:var(--grn);max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .upload-pill{display:none}
+    #uploadStatus{display:none}
 
     /* ── Content area ── */
     .content{flex:1;overflow:hidden;position:relative;display:flex;flex-direction:column}
@@ -145,6 +143,31 @@
     .btn.sm{padding:5px 10px;font-size:12px}
     .muted{color:var(--tx3);font-size:13px}
 
+    /* ── Upload panel ── */
+    .statrow{display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+    .stat{flex:1;min-width:100px;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:14px 16px}
+    .statn{font-family:'Saira';font-weight:700;font-size:26px;letter-spacing:.01em;color:var(--tx)}
+    .statn.gr{color:var(--grn)}.statn.am{color:var(--amb)}
+    .statl{font-family:var(--mono);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--tx3);margin-top:3px}
+    .drop{border:1.5px dashed var(--line2);border-radius:14px;padding:36px;text-align:center;cursor:pointer;background:#ffffff04;transition:.15s}
+    .drop:hover,.drop.drag-over{border-color:#3fd07a66;background:#3fd07a08}
+    .dicon{width:46px;height:46px;border-radius:11px;background:var(--panel2);border:1px solid var(--line2);display:inline-flex;align-items:center;justify-content:center;font-family:var(--mono);color:var(--grn);font-size:20px;margin-bottom:12px}
+    .drop-big{font-family:'Saira';font-weight:600;font-size:18px;color:var(--tx);margin-bottom:6px}
+    .drop-sm{font-size:12.5px;color:var(--tx3)}
+    .router{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0}
+    .rchip{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:11px 12px}
+    .rchip .rt{font-family:var(--mono);font-size:11px;color:var(--grn);margin-bottom:4px}
+    .rchip .rd{font-size:11.5px;color:var(--tx3)}
+    .frow{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--panel);margin-bottom:8px;flex-wrap:wrap}
+    .fname{font-size:13.5px;font-weight:600;flex:1;min-width:0;display:flex;align-items:center;gap:8px}
+    .fname .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tx)}
+    .fstage{font-family:var(--mono);font-size:11px;color:var(--amb);width:120px;text-align:right;flex:none}
+    .fstage.done{color:var(--grn)}
+    .fbar{width:130px;height:5px;background:var(--ins);border-radius:3px;overflow:hidden;flex:none}
+    .fbar i{display:block;height:100%;background:var(--amb);transition:width .35s ease}
+    .fbar.done i{background:var(--grn)}
+    .fchunks{font-family:var(--mono);font-size:11px;color:var(--tx2);flex:none}
+
     /* ── Chunk inspector ── */
     #chunkList{max-height:320px;overflow-y:auto}
     .chunk-row{padding:9px 10px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px;border-radius:6px;transition:.1s}
@@ -206,28 +229,35 @@
     <nav class="nav">
       <div class="navi on" onclick="switchTab('ask')" id="nav-ask">
         <span class="nidx">01</span>
-        <span class="nlbl">Ask</span>
+        <span class="nlbl">Chat</span>
+      </div>
+      <div class="navi" onclick="switchTab('upload')" id="nav-upload">
+        <span class="nidx">02</span>
+        <span class="nlbl">Upload &amp; Ingest</span>
+        <span class="nbadge" id="docBadge">—</span>
       </div>
       <div class="navi" onclick="switchTab('chunks')" id="nav-chunks">
-        <span class="nidx">02</span>
+        <span class="nidx">03</span>
         <span class="nlbl">Indexed Chunks</span>
         <span class="nbadge" id="chunkBadge">—</span>
       </div>
       <div class="navi" onclick="switchTab('graph')" id="nav-graph">
-        <span class="nidx">03</span>
+        <span class="nidx">04</span>
         <span class="nlbl">Knowledge Graph</span>
       </div>
       <div class="navi" onclick="switchTab('entities')" id="nav-entities">
-        <span class="nidx">04</span>
+        <span class="nidx">05</span>
         <span class="nlbl">Entities</span>
       </div>
       <div class="navi" onclick="switchTab('gaps')" id="nav-gaps">
-        <span class="nidx">05</span>
+        <span class="nidx">06</span>
         <span class="nlbl">Gaps</span>
         <span class="nbadge" id="gapBadge">—</span>
       </div>
     </nav>
     <div class="railftr">
+      <div class="kbstat"><span>Documents</span><b id="docCountLabel">—</b></div>
+      <div class="kbstat"><span>Chunks</span><b id="chunkCountLabel">—</b></div>
       <div class="kbstat"><span>Model</span><b id="modelLabel">—</b></div>
       <div class="kbstat"><span>Status</span><b id="statusLabel" style="color:var(--grn)">ready</b></div>
     </div>
@@ -248,11 +278,6 @@
           <button class="segb" id="btnBeginner" onclick="setMode('beginner')">Beginner</button>
           <button class="segb on acc" id="btnExpert" onclick="setMode('expert')">Expert</button>
         </div>
-        <!-- Upload button -->
-        <label class="upload-pill" title="Upload document">
-          <span>📎 Upload</span>
-          <input type="file" id="file" onchange="upload()" style="position:absolute;inset:0;opacity:0;cursor:pointer"/>
-        </label>
       </div>
     </div>
 
@@ -295,6 +320,67 @@
               <div id="sourceCards"></div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- ── Upload tab ── -->
+      <div class="tab-panel" id="tab-upload">
+        <div class="pad">
+
+          <!-- Stats row -->
+          <div class="statrow">
+            <div class="stat">
+              <div class="statn gr" id="statDocs">0</div>
+              <div class="statl">Documents</div>
+            </div>
+            <div class="stat">
+              <div class="statn" id="statChunks">0</div>
+              <div class="statl">Chunks indexed</div>
+            </div>
+            <div class="stat">
+              <div class="statn" id="statFacts">0</div>
+              <div class="statl">Structured facts</div>
+            </div>
+            <div class="stat">
+              <div class="statn am" id="statDupes">0</div>
+              <div class="statl">Duplicates merged</div>
+            </div>
+          </div>
+
+          <!-- Drop zone -->
+          <div class="drop" id="dropZone" onclick="document.getElementById('fileInput').click()"
+               ondragover="event.preventDefault();this.classList.add('drag-over')"
+               ondragleave="this.classList.remove('drag-over')"
+               ondrop="event.preventDefault();this.classList.remove('drag-over');handleDrop(event)">
+            <div class="dicon">↑</div>
+            <div class="drop-big">Drop files — any format</div>
+            <div class="drop-sm">.pdf · scanned .pdf · images · .docx · .doc · .xlsx · .csv · .pptx · .url</div>
+            <input type="file" id="fileInput" multiple style="display:none" onchange="handleFiles(this.files)"/>
+          </div>
+
+          <!-- Format router info grid -->
+          <div class="sect" style="margin-top:22px">
+            Format Router
+            <span class="lbl" style="margin-left:auto">format_router.py · auto-detect type + language</span>
+          </div>
+          <div class="router">
+            <div class="rchip"><div class="rt">PDF · text</div><div class="rd">pdf_parser.py · PyMuPDF</div></div>
+            <div class="rchip"><div class="rt">Scanned · image</div><div class="rd">ocr.py · Tesseract de+en</div></div>
+            <div class="rchip"><div class="rt">DOCX / DOC</div><div class="rd">docx_parser · doc_convert</div></div>
+            <div class="rchip"><div class="rt">XLSX / CSV</div><div class="rd">sheet_parser · table-aware</div></div>
+            <div class="rchip"><div class="rt">PPTX</div><div class="rd">pptx_parser · slides+notes</div></div>
+            <div class="rchip"><div class="rt">URL shortcut</div><div class="rd">link_handler · ref only</div></div>
+            <div class="rchip"><div class="rt">Normalise</div><div class="rd">corpus_builder · clean text</div></div>
+            <div class="rchip"><div class="rt">Embed · Dedup</div><div class="rd">multilingual · cosine≥0.98</div></div>
+          </div>
+
+          <!-- Ingestion queue -->
+          <div class="sect" style="margin-top:6px">
+            Ingestion Queue
+            <span class="lbl" style="margin-left:auto">parse → chunk → embed → index</span>
+          </div>
+          <div id="fileQueue"></div>
+
         </div>
       </div>
 
@@ -385,7 +471,7 @@
   });
 
   // ── Tab switching ──────────────────────────────────────────────────────
-  const TAB_LABELS = {ask:"Ask",chunks:"Indexed Chunks",graph:"Knowledge Graph",entities:"Entities",gaps:"Gaps"};
+  const TAB_LABELS = {ask:"Chat",upload:"Upload & Ingest",chunks:"Indexed Chunks",graph:"Knowledge Graph",entities:"Entities",gaps:"Gaps"};
   function switchTab(name) {
     document.querySelectorAll(".navi").forEach(n => n.classList.remove("on"));
     const nav = document.getElementById("nav-" + name);
@@ -414,38 +500,103 @@
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(); }
   }
 
-  // ── Upload ────────────────────────────────────────────────────────────
-  async function upload() {
-    const f = document.getElementById("file").files[0];
-    if (!f) return;
-    const el = document.getElementById("uploadStatus");
-    el.innerHTML = '<span class="spinner"></span> indexing…';
+  // ── Upload (streaming SSE progress) ──────────────────────────────────
+  function handleDrop(e) { handleFiles(e.dataTransfer.files); }
+  function handleFiles(files) {
+    if (!files || !files.length) return;
+    switchTab("upload");
+    Array.from(files).forEach(f => _uploadFile(f));
+  }
+
+  let _totalDocs = 0, _totalChunks = 0, _totalFacts = 0, _totalDupes = 0;
+
+  async function _uploadFile(file) {
+    const rowId = "frow-" + Date.now() + Math.random().toString(36).slice(2);
+    const ext   = file.name.split(".").pop().toUpperCase();
+    const fmtCls = _fmtClass(file.name);
+
+    // Add row to queue
+    const queue = document.getElementById("fileQueue");
+    const row = document.createElement("div");
+    row.className = "frow"; row.id = rowId;
+    row.innerHTML = `
+      <span class="tag ${fmtCls}">${ext}</span>
+      <div class="fname"><span class="nm">${file.name}</span></div>
+      <div class="fbar" id="${rowId}-bar"><i style="width:0%"></i></div>
+      <div class="fstage" id="${rowId}-stage">Uploading…</div>
+      <div class="fchunks" id="${rowId}-chunks"></div>`;
+    queue.prepend(row);
+
     document.getElementById("statusLabel").textContent = "indexing";
     document.getElementById("statusLabel").style.color = "var(--amb)";
-    const fd = new FormData(); fd.append("file", f);
+
+    const fd = new FormData(); fd.append("file", file);
     try {
-      const r = await fetch("/upload", { method: "POST", body: fd });
-      const j = await r.json();
-      if (j.error) {
-        el.textContent = "Error: " + j.error;
-      } else {
-        el.textContent = `✓ ${j.filename} v${j.version||1} — ${j.chunks} chunks`;
-        document.getElementById("chunkBadge").textContent = j.chunks;
-        document.getElementById("statusLabel").textContent = "ready";
-        document.getElementById("statusLabel").style.color = "var(--grn)";
-        setTimeout(_refreshAllDataTabs, 1500);
+      const resp = await fetch("/upload/stream", { method: "POST", body: fd });
+      const reader  = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const blocks = buf.split("\n\n"); buf = blocks.pop();
+
+        for (const block of blocks) {
+          if (!block.startsWith("data: ")) continue;
+          let ev; try { ev = JSON.parse(block.slice(6)); } catch { continue; }
+
+          if (ev.type === "stage") {
+            document.getElementById(rowId + "-bar").querySelector("i").style.width = ev.pct + "%";
+            document.getElementById(rowId + "-stage").textContent = ev.text;
+          } else if (ev.type === "done") {
+            document.getElementById(rowId + "-bar").className = "fbar done";
+            document.getElementById(rowId + "-bar").querySelector("i").style.width = "100%";
+            document.getElementById(rowId + "-stage").className = "fstage done";
+            document.getElementById(rowId + "-stage").textContent = "Indexed ✓";
+            document.getElementById(rowId + "-chunks").textContent = ev.chunks + " chunks";
+            _totalDocs++;
+            _totalChunks += ev.chunks || 0;
+            _totalFacts  += ev.facts  || 0;
+            _totalDupes  += ev.skipped_duplicates || 0;
+            _updateUploadStats();
+            document.getElementById("statusLabel").textContent = "ready";
+            document.getElementById("statusLabel").style.color = "var(--grn)";
+            setTimeout(_refreshAllDataTabs, 800);
+          } else if (ev.type === "error") {
+            document.getElementById(rowId + "-stage").textContent = "Error: " + ev.text;
+            document.getElementById(rowId + "-stage").style.color = "var(--red)";
+            document.getElementById("statusLabel").textContent = "error";
+            document.getElementById("statusLabel").style.color = "var(--red)";
+          }
+        }
       }
     } catch (e) {
-      el.textContent = "Upload failed";
-      document.getElementById("statusLabel").textContent = "error";
-      document.getElementById("statusLabel").style.color = "var(--red)";
+      document.getElementById(rowId + "-stage").textContent = "Failed: " + e.message;
+      document.getElementById(rowId + "-stage").style.color = "var(--red)";
     }
   }
+
+  function _updateUploadStats() {
+    document.getElementById("statDocs").textContent   = _totalDocs;
+    document.getElementById("statChunks").textContent = _totalChunks;
+    document.getElementById("statFacts").textContent  = _totalFacts;
+    document.getElementById("statDupes").textContent  = _totalDupes;
+    document.getElementById("docBadge").textContent   = _totalDocs;
+    document.getElementById("docCountLabel").textContent   = _totalDocs;
+    document.getElementById("chunkCountLabel").textContent = _totalChunks;
+  }
+
+  // Legacy single-file upload kept for _refreshAllDataTabs usage
+  async function upload() {}
 
   function _refreshAllDataTabs() {
     fetch("/chunks?limit=100").then(r => r.json()).then(j => {
       _renderChunks(j);
-      document.getElementById("chunkBadge").textContent = (j.chunks||[]).length || "—";
+      const n = (j.chunks||[]).length;
+      document.getElementById("chunkBadge").textContent = n || "—";
+      document.getElementById("chunkCountLabel").textContent = n || "—";
     }).catch(() => {});
     fetch("/graph").then(r => r.json()).then(j => { _graphData = j; }).catch(() => {});
     fetch("/entities").then(r => r.json()).then(j => _renderEntities(j)).catch(() => {});

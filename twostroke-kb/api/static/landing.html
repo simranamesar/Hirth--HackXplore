@@ -104,6 +104,15 @@
     }
     .cta-sec:hover{border-color:var(--grn);color:var(--tx)}
 
+    /* ── Transition overlay ── */
+    #exit-overlay{
+      position:fixed;inset:0;z-index:9999;
+      background:#05070a;
+      opacity:0;pointer-events:none;
+      transition:opacity .6s ease;
+    }
+    #exit-overlay.active{opacity:1;pointer-events:all}
+
     /* ── Feature strip ── */
     .features{
       position:relative;z-index:2;
@@ -144,6 +153,7 @@
   </style>
 </head>
 <body>
+  <div id="exit-overlay"></div>
 
   <!-- Nav -->
   <nav>
@@ -154,7 +164,7 @@
         <div class="bsub">Hirth Engine Intelligence</div>
       </div>
     </div>
-    <a href="/app" class="nav-cta">Enter the platform →</a>
+    <button class="nav-cta" onclick="enterPlatform()">Enter the platform →</button>
   </nav>
 
   <!-- Hero -->
@@ -180,10 +190,10 @@
       </p>
 
       <div class="cta-row">
-        <a href="/app" class="cta-pri">
+        <button class="cta-pri" onclick="enterPlatform()">
           <span>Enter the platform</span>
           <span>→</span>
-        </a>
+        </button>
         <a href="/health" class="cta-sec">API status</a>
       </div>
 
@@ -228,6 +238,14 @@
   <footer>
     TwoStrokeGPT — Hirth Engines Hackathon &nbsp;·&nbsp; 2026
   </footer>
+
+  <script>
+    function enterPlatform() {
+      const ov = document.getElementById('exit-overlay');
+      ov.classList.add('active');
+      setTimeout(() => { window.location.href = '/app'; }, 620);
+    }
+  </script>
 
 </body>
 </html>

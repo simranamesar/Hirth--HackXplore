@@ -37,7 +37,8 @@ def health() -> dict:
 
 @app.post("/upload")
 async def upload(file: UploadFile = File(...)) -> JSONResponse:
-    """Save the upload and run the ingestion pipeline, returning chunk counts."""
+    """Save the upload and run the ingestion pipeline (non-streaming fallback)."""
+    import asyncio
     upload_dir = Path(settings.upload_dir)
     upload_dir.mkdir(parents=True, exist_ok=True)
     dest = upload_dir / file.filename
@@ -45,7 +46,8 @@ async def upload(file: UploadFile = File(...)) -> JSONResponse:
 
     from ingestion.orchestrator import run_ingestion
 
-    result = run_ingestion(dest)
+    # Run blocking ingestion in a thread so we don't block the event loop
+    result = await asyncio.to_thread(run_ingestion, dest)
     return JSONResponse({
         "filename": result.filename,
         "chunks": result.chunks,
@@ -54,6 +56,110 @@ async def upload(file: UploadFile = File(...)) -> JSONResponse:
         "version": result.version,
         "status": "indexed",
     })
+
+
+@app.post("/upload/stream")
+async def upload_stream(file: UploadFile = File(...)) -> StreamingResponse:
+    """Upload a file and stream ingestion progress as SSE events.
+
+    Events:
+      {"type": "stage",  "text": "Parsing…",  "pct": 10}
+      {"type": "stage",  "text": "Chunking…", "pct": 40}
+      {"type": "done",   "filename": …, "chunks": …, "facts": …, …}
+      {"type": "error",  "text": "…"}
+    """
+    import asyncio
+
+    upload_dir = Path(settings.upload_dir)
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    dest = upload_dir / file.filename
+    dest.write_bytes(await file.read())
+
+    async def _generate():
+        import queue, threading
+
+        q: queue.Queue = queue.Queue()
+
+        def _run():
+            try:
+                # Monkey-patch orchestrator to send progress via queue
+                from ingestion import format_router, corpus_builder, chunker as chunker_mod
+                from ingestion import domain_enricher, dedup as dedup_mod, knowledge_base, graph_builder
+                from ingestion.orchestrator import _slug, _register_document, IngestResult
+                from pathlib import Path as _Path
+                import re as _re, logging as _log
+
+                p = _Path(dest)
+                q.put({"type": "stage", "text": "Parsing document…", "pct": 10})
+                doc = format_router.route(p)
+
+                version = 1
+                try:
+                    doc_id = _slug(p.name)
+                    lang = doc.metadata.get("lang", "unknown")
+                    version = _register_document(doc_id, p.name, lang, storage_uri=str(p))
+                except Exception:
+                    pass
+
+                q.put({"type": "stage", "text": "Normalising text…", "pct": 22})
+                clean = corpus_builder.normalize(doc)
+
+                q.put({"type": "stage", "text": "Chunking…", "pct": 35})
+                chunks = chunker_mod.chunk(clean)
+
+                q.put({"type": "stage", "text": f"Enriching {len(chunks)} chunks…", "pct": 50})
+                try:
+                    chunks = domain_enricher.enrich(chunks)
+                except Exception:
+                    pass
+
+                q.put({"type": "stage", "text": "Embedding…", "pct": 65})
+                chunks = knowledge_base.embed(chunks)
+
+                q.put({"type": "stage", "text": "Deduplicating…", "pct": 78})
+                before = len(chunks)
+                try:
+                    chunks = dedup_mod.dedup_and_merge(chunks)
+                except Exception:
+                    pass
+                skipped = before - len(chunks)
+
+                q.put({"type": "stage", "text": f"Storing {len(chunks)} chunks…", "pct": 88})
+                knowledge_base.store(chunks)
+
+                q.put({"type": "stage", "text": "Building knowledge graph…", "pct": 95})
+                try:
+                    graph_builder.extract(clean)
+                except Exception:
+                    pass
+
+                fact_count = sum(1 for c in chunks if c["metadata"].get("chunk_type") == "table")
+                q.put({"type": "done", "filename": p.name, "chunks": len(chunks),
+                       "facts": fact_count, "skipped_duplicates": skipped,
+                       "version": version, "status": "indexed"})
+            except Exception as exc:
+                q.put({"type": "error", "text": str(exc)})
+
+        t = threading.Thread(target=_run, daemon=True)
+        t.start()
+
+        while True:
+            try:
+                msg = await asyncio.get_event_loop().run_in_executor(
+                    None, lambda: q.get(timeout=300)
+                )
+                yield f"data: {_json.dumps(msg)}\n\n"
+                if msg["type"] in ("done", "error"):
+                    break
+            except Exception as exc:
+                yield f"data: {_json.dumps({'type': 'error', 'text': str(exc)})}\n\n"
+                break
+
+    return StreamingResponse(
+        _generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.post("/ask")
