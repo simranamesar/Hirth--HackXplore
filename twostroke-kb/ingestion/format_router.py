@@ -39,24 +39,36 @@ def detect_language(text: str) -> str:
 def route(path: str | Path) -> ParsedDoc:
     """Dispatch a single uploaded file to its parser and return a ParsedDoc.
 
-    TODO: import and call the matching parser from .parsers, then set
-    metadata['lang'] = detect_language(doc.text).
+    Sets metadata['lang'] via langdetect after parsing.
+    Unsupported formats (sheet, pptx, ocr, doc_legacy) raise NotImplementedError.
     """
+    import logging
+    log = logging.getLogger(__name__)
+
     path = Path(path)
     handler = EXT_MAP.get(path.suffix.lower())
     if handler is None:
         raise ValueError(f"Unsupported format: {path.suffix}")
 
-    # Example wiring (uncomment as parsers are implemented):
-    # if handler == "pdf_or_ocr":
-    #     from .parsers import pdf_parser, ocr
-    #     doc = pdf_parser.parse(path)
-    #     if not doc.text.strip():          # scanned -> fall back to OCR
-    #         doc = ocr.parse(path)
-    # elif handler == "sheet":
-    #     from .parsers import sheet_parser; doc = sheet_parser.parse(path)
-    # ... etc
-    # doc.metadata["lang"] = detect_language(doc.text)
-    # return doc
+    if handler == "pdf_or_ocr":
+        from .parsers import pdf_parser
+        doc = pdf_parser.parse(path)
+        if not doc.text.strip():
+            log.warning("route: %s has no extractable text; OCR not available in this slice", path.name)
+    elif handler == "docx":
+        from .parsers import docx_parser
+        doc = docx_parser.parse(path)
+    elif handler == "text":
+        doc = ParsedDoc(
+            text=path.read_text(errors="replace"),
+            metadata={"filename": path.name, "type": "text"},
+            source_ref={"filename": path.name},
+        )
+    elif handler == "link":
+        from .parsers import link_handler
+        doc = link_handler.parse(path)
+    else:
+        raise NotImplementedError(f"Parser not yet implemented for handler '{handler}' ({path.suffix})")
 
-    raise NotImplementedError(f"TODO: wire parser for handler '{handler}'")
+    doc.metadata["lang"] = detect_language(doc.text)
+    return doc

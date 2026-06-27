@@ -1,6 +1,7 @@
-"""GRAPH 1 — the ingestion pipeline as a linear LangGraph.
+"""GRAPH 1 — the ingestion pipeline as a linear sequence.
 
-route -> normalize -> chunk -> enrich -> graph_build -> embed -> dedup -> store
+route -> normalize -> chunk -> embed -> store
+(dedup, domain_enricher, graph_builder wired in later slices)
 """
 from __future__ import annotations
 
@@ -17,20 +18,26 @@ class IngestResult:
 
 
 def run_ingestion(path: str | Path) -> IngestResult:
-    """Run the full pipeline for one uploaded file. Synchronous for now.
+    """Run the full ingestion pipeline for one uploaded file. Synchronous.
 
-    TODO: build a LangGraph StateGraph with one node per step below, or just call
-    them in sequence for the MVP:
-
-        from . import format_router, corpus_builder, chunker, domain_enricher,
-                      graph_builder, knowledge_base, dedup
-        doc   = format_router.route(path)
-        clean = corpus_builder.normalize(doc)
-        chunks = chunker.chunk(clean)
-        chunks = domain_enricher.enrich(chunks)
-        graph_builder.extract(clean)            # writes graph_nodes/edges
-        chunks = knowledge_base.embed(chunks)
-        kept   = dedup.dedup_and_merge(chunks)  # cosine>0.98 -> merge provenance
-        knowledge_base.store(kept)              # write to pgvector + structured_facts
+    Returns IngestResult with counts of chunks and structured_facts written.
     """
-    raise NotImplementedError("TODO: implement ingestion pipeline")
+    from . import format_router, corpus_builder, chunker, knowledge_base
+
+    path = Path(path)
+
+    doc = format_router.route(path)
+    clean = corpus_builder.normalize(doc)
+    chunks = chunker.chunk(clean)
+    chunks = knowledge_base.embed(chunks)
+    knowledge_base.store(chunks)
+
+    fact_count = sum(
+        1 for c in chunks if c["metadata"].get("chunk_type") == "table"
+    )
+    return IngestResult(
+        filename=path.name,
+        chunks=len(chunks),
+        facts=fact_count,
+        skipped_duplicates=0,
+    )
