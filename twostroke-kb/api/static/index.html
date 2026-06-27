@@ -1,613 +1,831 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>TwoStrokeGPT</title>
   <script src="https://d3js.org/d3.v7.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin=""/>
+  <link href="https://fonts.googleapis.com/css2?family=Saira:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
   <style>
-    :root {
-      --fg:#1c1917; --muted:#78716c; --bg:#fafaf9; --card:#fff;
-      --border:#e7e5e4; --accent:#b45309; --green:#15803d; --red:#b91c1c;
+    *{box-sizing:border-box}
+    :root{
+      --bg:#0b0f13;--bg2:#0e141a;--panel:#141b22;--panel2:#1a232c;--ins:#090d11;
+      --line:#222c36;--line2:#30404e;
+      --tx:#e8edf3;--tx2:#9aa7b5;--tx3:#66727e;
+      --grn:#3fd07a;--grn-glow:#3fd07a26;--amb:#f0a830;--red:#e5484d;--blu:#56a6ff;
+      --mono:'IBM Plex Mono',monospace;
     }
-    * { box-sizing: border-box; }
-    body { font-family: ui-sans-serif, system-ui, sans-serif; margin:0; background:var(--bg); color:var(--fg); }
-    header { padding:14px 24px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
-    header h1 { font-size:16px; font-weight:700; margin:0; flex:1; }
-    .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:16px; }
-    main { max-width:920px; margin:0 auto; padding:24px; }
-    .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-    input[type=text] { flex:1; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:14px; min-width:0; }
-    button { padding:9px 16px; border:0; border-radius:8px; background:var(--accent); color:#fff; font-weight:600; cursor:pointer; font-size:14px; }
-    button.secondary { background:#f5f5f4; color:var(--fg); border:1px solid var(--border); }
-    button.active   { background:var(--accent); color:#fff; }
-    button.inactive { background:#f5f5f4; color:var(--muted); border:1px solid var(--border); }
-    button.small    { padding:4px 10px; font-size:12px; }
-    .muted { color:var(--muted); font-size:13px; }
-    #answer { white-space:pre-wrap; line-height:1.6; margin-top:10px; min-height:1.5em; }
-    .cite {
-      font-size:12px; color:var(--muted); border-left:3px solid var(--accent);
-      padding:4px 8px; margin-top:6px; border-radius:0 4px 4px 0; background:#fef9f0;
-    }
-    .cite strong { color:var(--fg); }
-    .cite a { color:var(--accent); text-decoration:none; font-weight:600; }
-    .cite a:hover { text-decoration:underline; }
-    .related-pill {
-      display:inline-block; margin:3px; padding:4px 10px;
-      background:#f5f5f4; border:1px solid var(--border);
-      border-radius:999px; font-size:12px; cursor:pointer; color:var(--fg);
-    }
-    .related-pill:hover { background:#e7e5e4; }
-    .confidence { font-size:12px; font-weight:600; padding:2px 8px; border-radius:4px; margin-left:8px; }
-    .confidence.high { background:#dcfce7; color:var(--green); }
-    .confidence.low  { background:#fee2e2; color:var(--red); }
-    #uploadStatus { margin-top:8px; }
-    #answerSection { display:none; }
-    .spinner { display:inline-block; width:14px; height:14px; border:2px solid #ccc;
-      border-top-color:var(--accent); border-radius:50%; animation:spin .6s linear infinite; }
-    @keyframes spin { to { transform:rotate(360deg); } }
-    .streaming-cursor::after {
-      content: "▍"; animation: blink 1s step-end infinite; color:var(--accent);
-    }
-    @keyframes blink { 50% { opacity:0; } }
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--tx);font-family:'IBM Plex Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+    h1,h2,h3,p,ul{margin:0}
+    ::-webkit-scrollbar{width:8px;height:8px}
+    ::-webkit-scrollbar-thumb{background:var(--line2);border-radius:4px}
+    ::-webkit-scrollbar-track{background:transparent}
+    .mono{font-family:var(--mono)}
+    .lbl{font-family:var(--mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--tx3)}
 
-    /* Tabs */
-    .tabs { display:flex; gap:4px; margin-bottom:16px; border-bottom:2px solid var(--border); }
-    .tab { padding:8px 16px; cursor:pointer; border-radius:8px 8px 0 0; font-size:14px;
-           font-weight:600; color:var(--muted); background:transparent; border:none; }
-    .tab.active { color:var(--accent); border-bottom:2px solid var(--accent); margin-bottom:-2px; }
-    .tab-panel { display:none; }
-    .tab-panel.active { display:block; }
+    /* ── App shell ── */
+    .app{display:flex;height:100vh;overflow:hidden}
 
-    /* Chunk inspector */
-    #chunkList { max-height:320px; overflow-y:auto; }
-    .chunk-row { padding:8px; border-bottom:1px solid var(--border); cursor:pointer; font-size:13px; }
-    .chunk-row:hover { background:#f5f5f4; }
-    .chunk-row .chunk-meta { font-size:11px; color:var(--muted); margin-top:2px; }
-    #chunkDetail { margin-top:12px; display:none; }
-    #chunkDetail pre { background:#f5f5f4; border-radius:8px; padding:12px; font-size:12px;
-                        white-space:pre-wrap; word-break:break-word; max-height:240px; overflow-y:auto; }
+    /* ── Left rail ── */
+    .rail{width:236px;flex:none;background:var(--bg2);border-right:1px solid var(--line);display:flex;flex-direction:column}
+    .brandbox{padding:18px 18px 16px;border-bottom:1px solid var(--line)}
+    .brand{display:flex;align-items:center;gap:11px}
+    .bmark{width:34px;height:34px;border-radius:8px;background:var(--grn);display:flex;align-items:center;justify-content:center;color:#06210f;font-family:var(--mono);font-weight:600;font-size:14px;box-shadow:0 0 0 1px #ffffff14,0 6px 16px var(--grn-glow)}
+    .bname{font-family:'Saira';font-weight:700;font-size:16px;letter-spacing:.01em;line-height:1.05}
+    .bsub{font-family:var(--mono);font-size:9.5px;color:var(--tx3);letter-spacing:.12em;text-transform:uppercase;margin-top:3px}
+    .navsec{padding:16px 18px 7px;font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--tx3)}
+    .nav{padding:0 10px 10px;display:flex;flex-direction:column;gap:3px;flex:1;overflow:auto}
+    .navi{display:flex;align-items:center;gap:12px;padding:9px 11px;border-radius:8px;color:var(--tx2);cursor:pointer;border:1px solid transparent;transition:.12s;user-select:none}
+    .navi:hover{background:var(--panel);color:var(--tx)}
+    .navi.on{background:var(--grn-glow);color:var(--tx);border-color:#3fd07a40}
+    .nidx{font-family:var(--mono);font-size:11px;color:var(--tx3);width:16px}
+    .navi.on .nidx{color:var(--grn)}
+    .nlbl{font-size:14px;font-weight:500;flex:1}
+    .nbadge{font-family:var(--mono);font-size:10px;color:var(--tx3);background:#ffffff0a;padding:2px 6px;border-radius:5px}
+    .navi.on .nbadge{color:var(--grn);background:#3fd07a1f}
+    .railftr{border-top:1px solid var(--line);padding:14px 16px;display:flex;flex-direction:column;gap:4px}
+    .kbstat{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--tx2)}
+    .kbstat b{color:var(--tx);font-weight:600}
 
-    /* Knowledge graph */
-    #graphCanvas { width:100%; height:420px; border:1px solid var(--border); border-radius:8px;
-                   background:#fafaf9; overflow:hidden; }
-    #graphCanvas svg { width:100%; height:100%; }
-    .node circle { stroke:#fff; stroke-width:1.5px; }
-    .node text { font-size:11px; fill:var(--fg); pointer-events:none; }
-    .link { stroke:#d6d3d1; stroke-opacity:0.6; }
-    .link-label { font-size:9px; fill:var(--muted); }
-    #graphEmpty { text-align:center; padding:48px; color:var(--muted); display:none; }
+    /* ── Main area ── */
+    .main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+    .topbar{height:60px;flex:none;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:linear-gradient(180deg,var(--bg2),var(--bg))}
+    .tb-l{display:flex;align-items:center;gap:14px}
+    .page-t{font-family:'Saira';font-weight:600;font-size:18px;line-height:1}
+    .tb-r{display:flex;align-items:center;gap:10px}
+    .seg{display:flex;background:var(--ins);border:1px solid var(--line);border-radius:8px;padding:3px;gap:2px}
+    .segb{font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--tx2);padding:5px 10px;border-radius:6px;cursor:pointer;border:none;background:transparent;text-transform:uppercase;transition:.1s}
+    .segb.on{background:var(--panel2);color:var(--tx);box-shadow:inset 0 0 0 1px var(--line2)}
+    .segb.on.acc{color:var(--grn)}
+    .upload-pill{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:var(--tx2);background:var(--panel);border:1px solid var(--line);padding:5px 10px;border-radius:7px;cursor:pointer;position:relative}
+    .upload-pill input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
+    .upload-pill:hover{border-color:var(--line2);color:var(--tx)}
+    #uploadStatus{font-family:var(--mono);font-size:11px;color:var(--grn);max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-    /* Gaps dashboard */
-    .gap-row { padding:10px; border-bottom:1px solid var(--border); display:flex; gap:8px; align-items:flex-start; }
-    .gap-question { flex:1; font-size:13px; }
-    .gap-reason { font-size:11px; color:var(--muted); margin-top:2px; }
-    #gapsEmpty { text-align:center; padding:32px; color:var(--muted); }
+    /* ── Content area ── */
+    .content{flex:1;overflow:hidden;position:relative;display:flex;flex-direction:column}
+    .tab-panel{display:none;flex:1;overflow:hidden}
+    .tab-panel.active{display:flex;flex-direction:column}
 
-    /* Entities */
-    .entity-pill {
-      display:inline-block; margin:3px; padding:3px 9px;
-      border-radius:999px; font-size:12px; font-weight:600;
-    }
-    .entity-engine  { background:#fef3c7; color:#b45309; }
-    .entity-part    { background:#dcfce7; color:#15803d; }
-    .entity-symptom { background:#dbeafe; color:#1d4ed8; }
-    .entity-cause   { background:#ede9fe; color:#7c3aed; }
-    .entity-fix     { background:#ccfbf1; color:#0f766e; }
-    .entity-spec    { background:#fee2e2; color:#b91c1c; }
-    .entity-unit    { background:#f1f5f9; color:#475569; }
-    .entity-default { background:#f5f5f4; color:var(--fg); }
-    .tag-chip {
-      display:inline-block; margin:2px; padding:2px 8px;
-      background:#f5f5f4; border:1px solid var(--border);
-      border-radius:4px; font-size:11px; color:var(--muted);
-    }
-    #entitiesEmpty { text-align:center; padding:32px; color:var(--muted); }
+    /* ── Chat layout ── */
+    .chatwrap{display:grid;grid-template-columns:1fr 320px;flex:1;overflow:hidden;min-height:0}
+    .chatmain{display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--line)}
+    .convo{overflow:auto;padding:24px 28px;display:flex;flex-direction:column;gap:22px;flex:1}
+    .convo-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:12px;color:var(--tx3)}
+    .convo-empty .ico{font-size:32px;opacity:.4}
+    .convo-empty p{font-family:var(--mono);font-size:12px;letter-spacing:.07em;text-transform:uppercase}
+
+    /* ── Messages ── */
+    .who{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+    .ava{width:22px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:9px;font-weight:600;flex:none}
+    .ava.u{background:var(--panel2);color:var(--tx2);border:1px solid var(--line2)}
+    .ava.a{background:var(--grn);color:#06210f}
+    .whoname{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--tx3)}
+    .ubub{align-self:flex-end;max-width:76%;background:var(--panel2);border:1px solid var(--line2);border-radius:13px 13px 4px 13px;padding:13px 16px;font-size:14.5px;line-height:1.5;white-space:pre-wrap}
+    .arow{align-self:stretch}
+    .answer{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;font-size:14.5px;line-height:1.65;white-space:pre-wrap}
+    .ansftr{display:flex;align-items:center;justify-content:space-between;margin-top:14px;padding-top:13px;border-top:1px solid var(--line);flex-wrap:wrap;gap:8px}
+    .grounded-badge{font-family:var(--mono);font-size:10.5px;display:flex;align-items:center;gap:6px;letter-spacing:.05em}
+    .grounded-badge.ok{color:var(--grn)}
+    .grounded-badge.warn{color:var(--amb)}
+    .grounded-badge .dot{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor}
+    .fbrow{display:flex;gap:7px;align-items:center}
+    .vbtn{height:30px;min-width:34px;padding:0 9px;border-radius:7px;border:1px solid var(--line2);background:var(--panel2);color:var(--tx2);cursor:pointer;font-size:12px;font-family:var(--mono);transition:.1s}
+    .vbtn:hover{color:var(--tx)}
+    .vbtn.up.on{color:var(--grn);border-color:#3fd07a55;background:#3fd07a14}
+    .vbtn.dn.on{color:var(--red);border-color:#e5484d55;background:#e5484d14}
+    .related-wrap{margin-top:12px;display:flex;flex-wrap:wrap;gap:6px}
+    .rel-chip{font-family:var(--mono);font-size:11px;color:var(--tx2);background:#ffffff08;border:1px solid var(--line);padding:5px 9px;border-radius:6px;cursor:pointer;white-space:nowrap}
+    .rel-chip:hover{border-color:var(--grn);color:var(--grn)}
+
+    /* ── Composer ── */
+    .composer{flex:none;border-top:1px solid var(--line);padding:16px 20px;background:var(--bg2)}
+    .composer-inner{display:flex;gap:10px;align-items:flex-end;background:var(--panel);border:1px solid var(--line2);border-radius:12px;padding:10px 14px;transition:.15s}
+    .composer-inner:focus-within{border-color:#3fd07a55}
+    .composer-ta{flex:1;background:transparent;border:none;outline:none;color:var(--tx);font-family:'IBM Plex Sans';font-size:14px;line-height:1.5;resize:none;max-height:140px;min-height:22px}
+    .composer-ta::placeholder{color:var(--tx3)}
+    .send-btn{flex:none;width:36px;height:36px;border-radius:9px;background:var(--grn);border:none;cursor:pointer;color:#06210f;display:flex;align-items:center;justify-content:center;font-size:16px;transition:.15s}
+    .send-btn:hover{filter:brightness(1.1)}
+    .send-btn:disabled{opacity:.4;cursor:not-allowed}
+    .spinner{display:inline-block;width:13px;height:13px;border:2px solid #3fd07a55;border-top-color:var(--grn);border-radius:50%;animation:spin .6s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .streaming-cursor::after{content:"▍";animation:blink 1s step-end infinite;color:var(--grn)}
+    @keyframes blink{50%{opacity:0}}
+
+    /* ── Event rail ── */
+    .evrail{overflow:auto;background:var(--bg2);padding:16px;display:flex;flex-direction:column;gap:16px}
+    .evh{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--tx3);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+    .trace{font-family:var(--mono);font-size:11.5px;background:var(--ins);border:1px solid var(--line);border-radius:9px;padding:10px 12px}
+    .tr{display:flex;gap:9px;padding:3px 0;color:var(--tx2);align-items:baseline;line-height:1.4}
+    .trk{color:var(--grn);width:52px;flex:none;font-size:10px}
+    .trk.b{color:var(--blu)}.trk.a{color:var(--amb)}
+    .srccard{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:11px 12px;margin-bottom:8px;cursor:pointer;transition:.1s}
+    .srccard:hover{border-color:var(--line2)}
+    .srccard-top{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+    .tag{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.03em;padding:3px 6px;border-radius:5px;text-transform:uppercase}
+    .fmt-pdf{color:#ff9483;background:#e5484d1c;border:1px solid #e5484d33}
+    .fmt-xlsx,.fmt-csv{color:var(--grn);background:#3fd07a16;border:1px solid #3fd07a33}
+    .fmt-docx,.fmt-doc{color:var(--amb);background:#f0a83016;border:1px solid #f0a83033}
+    .fmt-default{color:var(--tx2);background:#ffffff0a;border:1px solid var(--line2)}
+    .srccard-name{font-family:var(--mono);font-size:11px;color:var(--tx2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .srccard-page{font-family:var(--mono);font-size:10px;color:var(--tx3)}
+    .srccard-snippet{font-size:11.5px;color:var(--tx3);line-height:1.45;margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .cite-ref{font-family:var(--mono);font-size:9.5px;color:var(--grn);background:#3fd07a18;border:1px solid #3fd07a33;border-radius:4px;padding:1px 4px;margin:0 1px;vertical-align:super;cursor:pointer;text-decoration:none}
+    .cite-ref:hover{background:#3fd07a30}
+
+    /* ── Shared card ── */
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}
+    .sect{font-family:'Saira';font-weight:600;font-size:15px;margin-bottom:12px;display:flex;align-items:center;gap:10px;color:var(--tx)}
+    .btn{font-family:'IBM Plex Sans';font-size:13px;font-weight:600;padding:8px 14px;border-radius:8px;border:1px solid var(--line2);background:var(--panel2);color:var(--tx);cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:.1s}
+    .btn:hover{border-color:#3fd07a55;color:var(--grn)}
+    .btn.pri{background:var(--grn);color:#06210f;border-color:var(--grn)}
+    .btn.pri:hover{filter:brightness(1.07)}
+    .btn.sm{padding:5px 10px;font-size:12px}
+    .muted{color:var(--tx3);font-size:13px}
+
+    /* ── Chunk inspector ── */
+    #chunkList{max-height:320px;overflow-y:auto}
+    .chunk-row{padding:9px 10px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px;border-radius:6px;transition:.1s}
+    .chunk-row:hover{background:var(--panel2)}
+    .chunk-meta{font-size:11px;color:var(--tx3);margin-top:3px;font-family:var(--mono)}
+    #chunkDetail{margin-top:12px;display:none}
+    #chunkDetail pre{background:var(--ins);border:1px solid var(--line);border-radius:8px;padding:12px;font-size:12px;white-space:pre-wrap;word-break:break-word;max-height:280px;overflow-y:auto;color:var(--tx2);font-family:var(--mono)}
+
+    /* ── Knowledge graph ── */
+    #graphCanvas{width:100%;height:460px;border:1px solid var(--line);border-radius:10px;background:var(--ins);overflow:hidden}
+    #graphCanvas svg{width:100%;height:100%}
+    .node circle{stroke:var(--bg);stroke-width:1.5px}
+    .node text{font-size:10.5px;fill:var(--tx2);pointer-events:none;font-family:var(--mono)}
+    .link{stroke:var(--line2);stroke-opacity:0.7}
+    .link-label{font-size:9px;fill:var(--tx3);font-family:var(--mono)}
+    #graphEmpty{text-align:center;padding:60px;color:var(--tx3);font-family:var(--mono);font-size:12px;letter-spacing:.07em;text-transform:uppercase}
+
+    /* ── Entities ── */
+    .entity-pill{display:inline-block;margin:3px;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600;font-family:var(--mono)}
+    .entity-engine{background:#3fd07a14;color:var(--grn);border:1px solid #3fd07a33}
+    .entity-part{background:#ffffff08;color:var(--tx2);border:1px solid var(--line2)}
+    .entity-symptom{background:#56a6ff14;color:var(--blu);border:1px solid #56a6ff33}
+    .entity-cause{background:#f0a83014;color:var(--amb);border:1px solid #f0a83033}
+    .entity-fix{background:#3fd07a0a;color:#7ee8a2;border:1px solid #3fd07a22}
+    .entity-spec{background:#e5484d14;color:#ff9483;border:1px solid #e5484d33}
+    .entity-unit{background:#ffffff08;color:var(--tx3);border:1px solid var(--line)}
+    .entity-default{background:#ffffff08;color:var(--tx2);border:1px solid var(--line)}
+    .tag-chip{display:inline-block;margin:2px;padding:2px 8px;background:#ffffff08;border:1px solid var(--line);border-radius:4px;font-size:11px;color:var(--tx3);font-family:var(--mono)}
+
+    /* ── Gaps ── */
+    .gap-row{padding:12px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:flex-start}
+    .gap-question{flex:1;font-size:13px}
+    .gap-reason{font-size:11px;color:var(--tx3);margin-top:3px;font-family:var(--mono)}
+
+    /* ── Padded content wrapper ── */
+    .pad{padding:20px;overflow:auto;flex:1}
+
+    /* ── Input ── */
+    input[type=text]{background:var(--panel);border:1px solid var(--line2);border-radius:8px;padding:8px 12px;color:var(--tx);font-size:13px;outline:none;font-family:'IBM Plex Sans'}
+    input[type=text]::placeholder{color:var(--tx3)}
+    input[type=text]:focus{border-color:#3fd07a55}
   </style>
 </head>
 <body>
-  <header>
-    <h1>TwoStrokeGPT — two-stroke knowledge assistant</h1>
-    <span class="muted" style="font-size:13px">Mode:</span>
-    <button id="btnBeginner" class="inactive" onclick="setMode('beginner')">Beginner</button>
-    <button id="btnExpert"   class="active"   onclick="setMode('expert')">Expert</button>
-  </header>
+<div class="app">
 
-  <main>
-    <div class="tabs">
-      <button class="tab active" onclick="switchTab('ask')">Ask</button>
-      <button class="tab" onclick="switchTab('chunks')">Indexed Chunks</button>
-      <button class="tab" onclick="switchTab('graph')">Knowledge Graph</button>
-      <button class="tab" onclick="switchTab('entities')">Entities</button>
-      <button class="tab" onclick="switchTab('gaps')">Gaps</button>
+  <!-- ── Left rail ── -->
+  <aside class="rail">
+    <div class="brandbox">
+      <div class="brand">
+        <div class="bmark">TS</div>
+        <div>
+          <div class="bname">TwoStrokeGPT</div>
+          <div class="bsub">Engine Intelligence</div>
+        </div>
+      </div>
+    </div>
+    <div class="navsec">Navigation</div>
+    <nav class="nav">
+      <div class="navi on" onclick="switchTab('ask')" id="nav-ask">
+        <span class="nidx">01</span>
+        <span class="nlbl">Ask</span>
+      </div>
+      <div class="navi" onclick="switchTab('chunks')" id="nav-chunks">
+        <span class="nidx">02</span>
+        <span class="nlbl">Indexed Chunks</span>
+        <span class="nbadge" id="chunkBadge">—</span>
+      </div>
+      <div class="navi" onclick="switchTab('graph')" id="nav-graph">
+        <span class="nidx">03</span>
+        <span class="nlbl">Knowledge Graph</span>
+      </div>
+      <div class="navi" onclick="switchTab('entities')" id="nav-entities">
+        <span class="nidx">04</span>
+        <span class="nlbl">Entities</span>
+      </div>
+      <div class="navi" onclick="switchTab('gaps')" id="nav-gaps">
+        <span class="nidx">05</span>
+        <span class="nlbl">Gaps</span>
+        <span class="nbadge" id="gapBadge">—</span>
+      </div>
+    </nav>
+    <div class="railftr">
+      <div class="kbstat"><span>Model</span><b id="modelLabel">—</b></div>
+      <div class="kbstat"><span>Status</span><b id="statusLabel" style="color:var(--grn)">ready</b></div>
+    </div>
+  </aside>
+
+  <!-- ── Main ── -->
+  <div class="main">
+
+    <!-- Top bar -->
+    <div class="topbar">
+      <div class="tb-l">
+        <span class="page-t" id="pageTitle">Ask</span>
+        <div id="uploadStatus"></div>
+      </div>
+      <div class="tb-r">
+        <!-- Beginner / Expert toggle -->
+        <div class="seg">
+          <button class="segb" id="btnBeginner" onclick="setMode('beginner')">Beginner</button>
+          <button class="segb on acc" id="btnExpert" onclick="setMode('expert')">Expert</button>
+        </div>
+        <!-- Upload button -->
+        <label class="upload-pill" title="Upload document">
+          <span>📎 Upload</span>
+          <input type="file" id="file" onchange="upload()" style="position:absolute;inset:0;opacity:0;cursor:pointer"/>
+        </label>
+      </div>
     </div>
 
-    <!-- ── ASK TAB ─────────────────────────────────────────────────────── -->
-    <div id="tab-ask" class="tab-panel active">
+    <!-- Content -->
+    <div class="content">
 
-      <!-- Upload -->
-      <div class="card">
-        <strong>1 · Upload a document</strong>
-        <p class="muted" style="margin:4px 0 10px">PDF · scanned PDF · DOCX · DOC · XLSX · CSV · PPTX · images · .url</p>
-        <div class="row">
-          <input type="file" id="file" />
-          <button onclick="upload()">Upload &amp; Index</button>
-        </div>
-        <div id="uploadStatus" class="muted"></div>
-      </div>
+      <!-- ── Ask tab ── -->
+      <div class="tab-panel active" id="tab-ask">
+        <div class="chatwrap">
 
-      <!-- Ask -->
-      <div class="card">
-        <strong>2 · Ask a question (EN / DE)</strong>
-        <div class="row" style="margin-top:8px">
-          <input type="text" id="q"
-            placeholder="z. B. Warum überhitzt mein Hirth 3503 in der Höhe?" />
-          <button id="askBtn" onclick="ask()">Ask</button>
-        </div>
+          <!-- Chat main -->
+          <div class="chatmain">
+            <div class="convo" id="convo">
+              <div class="convo-empty" id="convoEmpty">
+                <div class="ico">⚙️</div>
+                <p>Upload a document, then ask a question</p>
+              </div>
+            </div>
 
-        <div id="answerSection">
-          <div class="row" style="margin-top:12px; align-items:flex-start">
-            <div id="answer" style="flex:1"></div>
-            <span id="confidenceBadge" class="confidence" style="flex-shrink:0"></span>
+            <!-- Composer -->
+            <div class="composer">
+              <div class="composer-inner">
+                <textarea class="composer-ta" id="q" rows="1"
+                  placeholder="Ask about Hirth two-stroke engines… (Enter to send, Shift+Enter for newline)"
+                  onkeydown="handleKey(event)"
+                  oninput="autoResize(this)"></textarea>
+                <button class="send-btn" id="sendBtn" onclick="ask()" title="Send">→</button>
+              </div>
+            </div>
           </div>
-          <div id="citations" style="margin-top:8px"></div>
-          <div id="related"  style="margin-top:10px"></div>
-          <div class="row" id="fb" style="margin-top:12px">
-            <button class="secondary" onclick="feedback(1)">👍 Helpful</button>
-            <button class="secondary" onclick="feedback(-1)">👎 Not right</button>
+
+          <!-- Event rail -->
+          <div class="evrail" id="evrail">
+            <div>
+              <div class="evh"><span>Agent trace</span></div>
+              <div id="traceLog" class="trace" style="display:none"></div>
+            </div>
+            <div id="sourcesSection" style="display:none">
+              <div class="evh"><span>Sources</span><span id="sourceCount" class="lbl"></span></div>
+              <div id="sourceCards"></div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- ── CHUNKS TAB ──────────────────────────────────────────────────── -->
-    <div id="tab-chunks" class="tab-panel">
-      <div class="card">
-        <strong>Indexed chunks</strong>
-        <div class="row" style="margin-top:10px; margin-bottom:10px">
-          <input type="text" id="chunkDocId" placeholder="Filter by doc_id (optional)" />
-          <button onclick="loadChunks()">Load</button>
-        </div>
-        <div id="chunkList"><span class="muted">Click Load to browse indexed chunks.</span></div>
-        <div id="chunkDetail">
-          <strong style="font-size:13px">Full chunk content</strong>
-          <pre id="chunkContent"></pre>
-          <div id="chunkMeta" class="muted" style="font-size:11px; margin-top:4px"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── GRAPH TAB ───────────────────────────────────────────────────── -->
-    <div id="tab-graph" class="tab-panel">
-      <div class="card" style="padding:12px">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px">
-          <strong>Knowledge Graph</strong>
-          <button class="secondary small" onclick="loadGraph()">Refresh</button>
-        </div>
-        <div id="graphCanvas"><svg id="graphSvg"></svg></div>
-        <div id="graphEmpty">No graph nodes yet — upload documents to build the knowledge graph.</div>
-        <div id="graphLegend" style="margin-top:8px; font-size:11px; color:var(--muted)">
-          <span style="color:#b45309">●</span> engine &nbsp;
-          <span style="color:#15803d">●</span> part &nbsp;
-          <span style="color:#1d4ed8">●</span> symptom &nbsp;
-          <span style="color:#7c3aed">●</span> cause &nbsp;
-          <span style="color:#0f766e">●</span> fix
+      <!-- ── Chunks tab ── -->
+      <div class="tab-panel" id="tab-chunks">
+        <div class="pad">
+          <div class="card">
+            <div class="sect">Indexed Chunks</div>
+            <div class="row" style="display:flex;gap:8px;margin-bottom:12px">
+              <input type="text" id="chunkDocId" placeholder="Filter by doc_id (optional)" style="flex:1"/>
+              <button class="btn sm" onclick="loadChunks()">Load</button>
+            </div>
+            <div id="chunkList"><span class="muted">Click Load to browse indexed chunks.</span></div>
+            <div id="chunkDetail">
+              <div class="sect" style="margin-top:14px">Full chunk</div>
+              <pre id="chunkContent"></pre>
+              <div id="chunkMeta" class="muted" style="font-size:11px;margin-top:6px;font-family:var(--mono)"></div>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- ── ENTITIES TAB ────────────────────────────────────────────────── -->
-    <div id="tab-entities" class="tab-panel">
-      <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px">
-          <strong>Extracted Entities &amp; Tags</strong>
-          <button class="secondary small" onclick="loadEntities()">Refresh</button>
+      <!-- ── Graph tab ── -->
+      <div class="tab-panel" id="tab-graph">
+        <div class="pad">
+          <div class="card">
+            <div class="sect">
+              Knowledge Graph
+              <button class="btn sm" style="margin-left:auto" onclick="loadGraph()">Refresh</button>
+            </div>
+            <div id="graphCanvas"><svg id="graphSvg"></svg></div>
+            <div id="graphEmpty" style="display:none"></div>
+            <div style="margin-top:8px;font-size:11px;color:var(--tx3);font-family:var(--mono)">
+              <span style="color:var(--grn)">●</span> engine &nbsp;
+              <span style="color:var(--tx2)">●</span> part &nbsp;
+              <span style="color:var(--amb)">●</span> symptom &nbsp;
+              <span style="color:#f0a830)">●</span> cause &nbsp;
+              <span style="color:#3fd07a99">●</span> fix
+            </div>
+          </div>
         </div>
-        <div id="entitiesContent"><span class="muted">Click Refresh to load entities extracted from ingested documents.</span></div>
       </div>
-    </div>
 
-    <!-- ── GAPS TAB ────────────────────────────────────────────────────── -->
-    <div id="tab-gaps" class="tab-panel">
-      <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px">
-          <strong>Knowledge Gaps</strong>
-          <button class="secondary small" onclick="loadGaps()">Refresh</button>
+      <!-- ── Entities tab ── -->
+      <div class="tab-panel" id="tab-entities">
+        <div class="pad">
+          <div class="card">
+            <div class="sect">
+              Extracted Entities &amp; Tags
+              <button class="btn sm" style="margin-left:auto" onclick="loadEntities()">Refresh</button>
+            </div>
+            <div id="entitiesContent"><span class="muted">Click Refresh to load entities.</span></div>
+          </div>
         </div>
-        <div id="gapsList"><span class="muted">Click Refresh to load open gaps.</span></div>
       </div>
-    </div>
-  </main>
 
-  <script>
-    const SID = "web-" + Math.random().toString(36).slice(2);
-    let last = { q: "", a: "" };
-    let mode = "expert";
-    let _abortCtrl = null;
+      <!-- ── Gaps tab ── -->
+      <div class="tab-panel" id="tab-gaps">
+        <div class="pad">
+          <div class="card">
+            <div class="sect">
+              Knowledge Gaps
+              <button class="btn sm" style="margin-left:auto" onclick="loadGaps()">Refresh</button>
+            </div>
+            <div id="gapsList"><span class="muted">Click Refresh to load open gaps.</span></div>
+          </div>
+        </div>
+      </div>
 
-    // ── Tab switching ────────────────────────────────────────────────────
-    function switchTab(name) {
-      document.querySelectorAll(".tab").forEach((t, i) => {
-        const names = ["ask","chunks","graph","entities","gaps"];
-        t.classList.toggle("active", names[i] === name);
-      });
-      document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
-      document.getElementById("tab-" + name).classList.add("active");
-      if (name === "graph")    loadGraph();
-      if (name === "gaps")     loadGaps();
-      if (name === "entities") loadEntities();
-    }
+    </div><!-- .content -->
+  </div><!-- .main -->
+</div><!-- .app -->
 
-    // ── Mode ─────────────────────────────────────────────────────────────
-    function setMode(m) {
-      mode = m;
-      document.getElementById("btnBeginner").className = m === "beginner" ? "active" : "inactive";
-      document.getElementById("btnExpert").className   = m === "expert"   ? "active" : "inactive";
-    }
+<script>
+  const SID = "web-" + Math.random().toString(36).slice(2);
+  let last = { q: "", a: "" };
+  let mode = "expert";
+  let _abortCtrl = null;
+  let _msgCount = 0;
 
-    // ── Upload ───────────────────────────────────────────────────────────
-    async function upload() {
-      const f = document.getElementById("file").files[0];
-      if (!f) return;
-      const el = document.getElementById("uploadStatus");
-      el.innerHTML = '<span class="spinner"></span> Uploading &amp; indexing…';
-      const fd = new FormData(); fd.append("file", f);
-      try {
-        const r = await fetch("/upload", { method: "POST", body: fd });
-        const j = await r.json();
-        el.textContent = j.error
-          ? "Error: " + j.error
-          : `✓ ${j.filename} v${j.version || 1} — ${j.chunks} chunks, ${j.facts} facts (${j.skipped_duplicates} dupes skipped)`;
-        // Auto-refresh data tabs after a successful upload
-        if (!j.error) {
-          // Small delay to let async enrichment settle
-          setTimeout(() => {
-            _refreshAllDataTabs();
-          }, 1500);
-        }
-      } catch (e) {
-        el.textContent = "Upload failed: " + e.message;
+  // Fetch model name for status rail
+  fetch("/health").then(() => {
+    document.getElementById("modelLabel").textContent = "qwen3";
+    document.getElementById("statusLabel").textContent = "online";
+  }).catch(() => {
+    document.getElementById("statusLabel").textContent = "offline";
+    document.getElementById("statusLabel").style.color = "var(--red)";
+  });
+
+  // ── Tab switching ──────────────────────────────────────────────────────
+  const TAB_LABELS = {ask:"Ask",chunks:"Indexed Chunks",graph:"Knowledge Graph",entities:"Entities",gaps:"Gaps"};
+  function switchTab(name) {
+    document.querySelectorAll(".navi").forEach(n => n.classList.remove("on"));
+    const nav = document.getElementById("nav-" + name);
+    if (nav) nav.classList.add("on");
+    document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+    document.getElementById("tab-" + name).classList.add("active");
+    document.getElementById("pageTitle").textContent = TAB_LABELS[name] || name;
+    if (name === "graph")    loadGraph();
+    if (name === "gaps")     loadGaps();
+    if (name === "entities") loadEntities();
+  }
+
+  // ── Mode ─────────────────────────────────────────────────────────────
+  function setMode(m) {
+    mode = m;
+    document.getElementById("btnBeginner").className = "segb" + (m === "beginner" ? " on acc" : "");
+    document.getElementById("btnExpert").className   = "segb" + (m === "expert"   ? " on acc" : "");
+  }
+
+  // ── Textarea auto-resize ──────────────────────────────────────────────
+  function autoResize(el) {
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 140) + "px";
+  }
+  function handleKey(e) {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(); }
+  }
+
+  // ── Upload ────────────────────────────────────────────────────────────
+  async function upload() {
+    const f = document.getElementById("file").files[0];
+    if (!f) return;
+    const el = document.getElementById("uploadStatus");
+    el.innerHTML = '<span class="spinner"></span> indexing…';
+    document.getElementById("statusLabel").textContent = "indexing";
+    document.getElementById("statusLabel").style.color = "var(--amb)";
+    const fd = new FormData(); fd.append("file", f);
+    try {
+      const r = await fetch("/upload", { method: "POST", body: fd });
+      const j = await r.json();
+      if (j.error) {
+        el.textContent = "Error: " + j.error;
+      } else {
+        el.textContent = `✓ ${j.filename} v${j.version||1} — ${j.chunks} chunks`;
+        document.getElementById("chunkBadge").textContent = j.chunks;
+        document.getElementById("statusLabel").textContent = "ready";
+        document.getElementById("statusLabel").style.color = "var(--grn)";
+        setTimeout(_refreshAllDataTabs, 1500);
       }
+    } catch (e) {
+      el.textContent = "Upload failed";
+      document.getElementById("statusLabel").textContent = "error";
+      document.getElementById("statusLabel").style.color = "var(--red)";
     }
+  }
 
-    function _refreshAllDataTabs() {
-      // Silently pre-fetch so tabs show data immediately when switched to
-      fetch("/chunks?limit=100").then(r => r.json()).then(j => _renderChunks(j)).catch(() => {});
-      fetch("/graph").then(r => r.json()).then(j => { _graphData = j; }).catch(() => {});
-      fetch("/entities").then(r => r.json()).then(j => _renderEntities(j)).catch(() => {});
-      fetch("/gaps").then(r => r.json()).then(j => _renderGaps(j)).catch(() => {});
-    }
+  function _refreshAllDataTabs() {
+    fetch("/chunks?limit=100").then(r => r.json()).then(j => {
+      _renderChunks(j);
+      document.getElementById("chunkBadge").textContent = (j.chunks||[]).length || "—";
+    }).catch(() => {});
+    fetch("/graph").then(r => r.json()).then(j => { _graphData = j; }).catch(() => {});
+    fetch("/entities").then(r => r.json()).then(j => _renderEntities(j)).catch(() => {});
+    fetch("/gaps").then(r => r.json()).then(j => {
+      _renderGaps(j);
+      const n = (j.gaps||[]).length;
+      document.getElementById("gapBadge").textContent = n || "—";
+    }).catch(() => {});
+  }
 
-    // ── Ask / stream ─────────────────────────────────────────────────────
-    async function ask() {
-      const q = document.getElementById("q").value.trim();
-      if (!q) return;
+  // ── Ask / stream ──────────────────────────────────────────────────────
+  async function ask() {
+    const q = document.getElementById("q").value.trim();
+    if (!q) return;
 
-      if (_abortCtrl) _abortCtrl.abort();
-      _abortCtrl = new AbortController();
+    if (_abortCtrl) _abortCtrl.abort();
+    _abortCtrl = new AbortController();
 
-      last = { q, a: "" };
-      const answerEl  = document.getElementById("answer");
-      const badgeEl   = document.getElementById("confidenceBadge");
-      const citesEl   = document.getElementById("citations");
-      const relatedEl = document.getElementById("related");
-      const fbEl      = document.getElementById("fb");
+    last = { q, a: "" };
+    document.getElementById("sendBtn").disabled = true;
+    document.getElementById("statusLabel").textContent = "thinking";
+    document.getElementById("statusLabel").style.color = "var(--amb)";
 
-      document.getElementById("answerSection").style.display = "block";
-      answerEl.className = "";
-      answerEl.innerHTML = '<span class="spinner"></span> <span class="muted">Thinking…</span>';
-      badgeEl.textContent = "";
-      citesEl.innerHTML   = "";
-      relatedEl.innerHTML = "";
-      fbEl.innerHTML =
-        '<button class="secondary" onclick="feedback(1)">👍 Helpful</button>' +
-        '<button class="secondary" onclick="feedback(-1)">👎 Not right</button>';
+    // Hide empty state
+    const emptyEl = document.getElementById("convoEmpty");
+    if (emptyEl) emptyEl.style.display = "none";
 
-      const fd = new FormData();
-      fd.append("question",   q);
-      fd.append("session_id", SID);
-      fd.append("expertise",  mode);
+    // Add user bubble
+    const convo = document.getElementById("convo");
+    const userDiv = document.createElement("div");
+    userDiv.className = "ubub";
+    userDiv.textContent = q;
+    convo.appendChild(userDiv);
+    convo.scrollTop = convo.scrollHeight;
 
-      let firstDelta = true;
+    // AI row placeholder
+    const aRow = document.createElement("div");
+    aRow.className = "arow";
+    aRow.id = "arow-" + (++_msgCount);
+    const ansDiv = document.createElement("div");
+    ansDiv.className = "answer";
+    ansDiv.innerHTML = '<span class="spinner"></span> <span style="color:var(--tx3)">Thinking…</span>';
+    aRow.appendChild(ansDiv);
+    convo.appendChild(aRow);
+    convo.scrollTop = convo.scrollHeight;
 
-      try {
-        const resp = await fetch("/ask/stream", {
-          method: "POST", body: fd, signal: _abortCtrl.signal
-        });
-        const reader  = resp.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
+    // Clear event rail
+    _clearEventRail();
+    document.getElementById("q").value = "";
+    document.getElementById("q").style.height = "auto";
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+    const fd = new FormData();
+    fd.append("question",   q);
+    fd.append("session_id", SID);
+    fd.append("expertise",  mode);
 
-          buffer += decoder.decode(value, { stream: true });
-          const blocks = buffer.split("\n\n");
-          buffer = blocks.pop();
+    let firstDelta = true;
+    let fullAnswer = "";
 
-          for (const block of blocks) {
-            if (!block.startsWith("data: ")) continue;
-            let ev;
-            try { ev = JSON.parse(block.slice(6)); } catch { continue; }
+    try {
+      const resp = await fetch("/ask/stream", { method: "POST", body: fd, signal: _abortCtrl.signal });
+      const reader  = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
 
-            if (ev.type === "thinking") {
-              if (firstDelta) {
-                answerEl.innerHTML =
-                  `<span class="spinner"></span> <span class="muted">${ev.text}</span>`;
-              }
-            } else if (ev.type === "delta") {
-              if (firstDelta) {
-                answerEl.textContent = "";
-                answerEl.className = "streaming-cursor";
-                firstDelta = false;
-              }
-              last.a += ev.text;
-              answerEl.textContent = last.a;
-            } else if (ev.type === "error") {
-              answerEl.className = "";
-              answerEl.textContent = "Error: " + ev.text;
-            } else if (ev.type === "done") {
-              answerEl.className = "";
-              _renderDone(ev, citesEl, badgeEl, relatedEl);
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const blocks = buf.split("\n\n");
+        buf = blocks.pop();
+
+        for (const block of blocks) {
+          if (!block.startsWith("data: ")) continue;
+          let ev;
+          try { ev = JSON.parse(block.slice(6)); } catch { continue; }
+
+          if (ev.type === "thinking") {
+            _addTraceStep(ev.text, "grn");
+          } else if (ev.type === "delta") {
+            if (firstDelta) {
+              ansDiv.className = "answer streaming-cursor";
+              ansDiv.textContent = "";
+              firstDelta = false;
+            }
+            fullAnswer += ev.text;
+            last.a += ev.text;
+            ansDiv.textContent = fullAnswer;
+            convo.scrollTop = convo.scrollHeight;
+          } else if (ev.type === "error") {
+            ansDiv.className = "answer";
+            ansDiv.textContent = "Error: " + ev.text;
+          } else if (ev.type === "done") {
+            ansDiv.className = "answer";
+            _renderAnswerFooter(aRow, ansDiv, ev);
+            _renderSourceCards(ev.citations || []);
+            if (ev.related_questions && ev.related_questions.length) {
+              _renderRelated(aRow, ev.related_questions);
             }
           }
         }
-      } catch (e) {
-        if (e.name !== "AbortError") {
-          answerEl.className = "";
-          answerEl.textContent = "Error: " + e.message;
-        }
+      }
+    } catch (e) {
+      if (e.name !== "AbortError") {
+        ansDiv.className = "answer";
+        ansDiv.textContent = "Connection error: " + e.message;
       }
     }
 
-    function _renderDone(ev, citesEl, badgeEl, relatedEl) {
-      if (ev.confidence) {
-        badgeEl.textContent = ev.confidence === "high" ? "✓ Grounded" : "⚠ Unverified";
-        badgeEl.className   = "confidence " + (ev.confidence === "high" ? "high" : "low");
-      }
+    document.getElementById("sendBtn").disabled = false;
+    document.getElementById("statusLabel").textContent = "ready";
+    document.getElementById("statusLabel").style.color = "var(--grn)";
+    convo.scrollTop = convo.scrollHeight;
+  }
 
-      const cites = (ev.citations || []).map(c => {
-        const loc = c.page ? ` p.${c.page}` : "";
-        // Left-click → in-page (Indexed Chunks tab); right-click → new tab via href
-        const anchor = c.id
-          ? `<a href="/chunks/${c.id}/view" onclick="viewChunk(${c.id});return false">View source ↗</a>`
-          : "";
-        return `<div class="cite">
-          <strong>[${c.n}]</strong> ${c.filename || c.doc_id}${loc} ${anchor}<br>
-          <span class="muted">${(c.snippet || "").slice(0, 120)}…</span>
-        </div>`;
-      }).join("");
-      citesEl.innerHTML = cites;
+  function _renderAnswerFooter(aRow, ansDiv, ev) {
+    const isGrounded = ev.confidence === "high";
+    const ftr = document.createElement("div");
+    ftr.className = "ansftr";
+    ftr.innerHTML = `
+      <div class="grounded-badge ${isGrounded ? "ok" : "warn"}">
+        <span class="dot"></span>
+        ${isGrounded ? "Grounded" : "Unverified"}
+      </div>
+      <div class="fbrow">
+        <button class="vbtn up" onclick="feedback(1,this)">👍</button>
+        <button class="vbtn dn" onclick="feedback(-1,this)">👎</button>
+      </div>`;
+    aRow.appendChild(ftr);
+  }
 
-      const rel = ev.related_questions || [];
-      if (rel.length) {
-        relatedEl.innerHTML =
-          '<div class="muted" style="margin-bottom:4px">Related questions:</div>' +
-          rel.map(q => `<span class="related-pill" onclick="setQ(this)">${q}</span>`).join("");
-      }
+  function _renderRelated(aRow, qs) {
+    const wrap = document.createElement("div");
+    wrap.className = "related-wrap";
+    qs.forEach(q => {
+      const chip = document.createElement("span");
+      chip.className = "rel-chip";
+      chip.textContent = q;
+      chip.onclick = () => { document.getElementById("q").value = q; ask(); };
+      wrap.appendChild(chip);
+    });
+    aRow.appendChild(wrap);
+  }
+
+  // ── Event rail helpers ─────────────────────────────────────────────────
+  function _clearEventRail() {
+    document.getElementById("traceLog").style.display = "none";
+    document.getElementById("traceLog").innerHTML = "";
+    document.getElementById("sourcesSection").style.display = "none";
+    document.getElementById("sourceCards").innerHTML = "";
+  }
+
+  function _addTraceStep(text, variant) {
+    const log = document.getElementById("traceLog");
+    log.style.display = "block";
+    const tr = document.createElement("div");
+    tr.className = "tr";
+    const key = document.createElement("span");
+    key.className = "trk" + (variant === "b" ? " b" : variant === "a" ? " a" : "");
+    key.textContent = variant === "b" ? "→ INFO" : "→ STEP";
+    const val = document.createElement("span");
+    val.textContent = text;
+    tr.appendChild(key); tr.appendChild(val);
+    log.appendChild(tr);
+  }
+
+  function _fmtClass(filename) {
+    const ext = (filename || "").split(".").pop().toLowerCase();
+    if (ext === "pdf") return "fmt-pdf";
+    if (ext === "xlsx" || ext === "csv") return "fmt-xlsx";
+    if (ext === "docx" || ext === "doc") return "fmt-docx";
+    return "fmt-default";
+  }
+
+  function _renderSourceCards(citations) {
+    if (!citations.length) return;
+    const sec = document.getElementById("sourcesSection");
+    const cards = document.getElementById("sourceCards");
+    sec.style.display = "block";
+    document.getElementById("sourceCount").textContent = citations.length + " sources";
+    cards.innerHTML = citations.map(c => {
+      const ext = (c.filename || "").split(".").pop().toUpperCase() || "DOC";
+      const page = c.page ? ` · p.${c.page}` : "";
+      const viewAttr = c.id ? `onclick="viewChunk(${c.id})"` : "";
+      return `<div class="srccard" ${viewAttr}>
+        <div class="srccard-top">
+          <span class="tag ${_fmtClass(c.filename)}">${ext}</span>
+          <span class="srccard-name">${c.filename || c.doc_id || "unknown"}</span>
+          <span class="srccard-page">${page}</span>
+        </div>
+        <div class="srccard-snippet">${(c.snippet||"").slice(0,140)}…</div>
+      </div>`;
+    }).join("");
+  }
+
+  // ── Feedback ──────────────────────────────────────────────────────────
+  async function feedback(vote, btn) {
+    const fd = new FormData();
+    fd.append("session_id", SID);
+    fd.append("question",   last.q);
+    fd.append("answer",     last.a);
+    fd.append("vote",       vote);
+    try { await fetch("/feedback", { method: "POST", body: fd }); } catch (_) {}
+    const row = btn.closest(".fbrow");
+    if (row) row.innerHTML = '<span style="font-family:var(--mono);font-size:11px;color:var(--grn)">feedback recorded</span>';
+  }
+
+  // ── Chunk inspector ───────────────────────────────────────────────────
+  async function loadChunks() {
+    const docId = document.getElementById("chunkDocId").value.trim();
+    const url   = docId ? `/chunks?doc_id=${encodeURIComponent(docId)}&limit=100` : "/chunks?limit=100";
+    const el    = document.getElementById("chunkList");
+    el.innerHTML = '<span class="spinner"></span>';
+    try {
+      const r = await fetch(url);
+      const j = await r.json();
+      _renderChunks(j, el);
+    } catch (e) {
+      el.innerHTML = `<span class="muted">Error: ${e.message}</span>`;
     }
+  }
 
-    function setQ(el) {
-      document.getElementById("q").value = el.textContent;
-      ask();
+  function _renderChunks(j, el) {
+    el = el || document.getElementById("chunkList");
+    if (!el) return;
+    if (!j.chunks || !j.chunks.length) {
+      el.innerHTML = '<span class="muted">No chunks found. Upload a document first.</span>';
+      return;
     }
+    el.innerHTML = j.chunks.map(c => `
+      <div class="chunk-row" onclick="viewChunk(${c.id})">
+        <strong style="color:var(--grn)">[${c.id}]</strong>
+        <span style="color:var(--tx2)"> ${c.doc_id}</span>
+        — ${(c.snippet||"").slice(0,80)}…
+        <div class="chunk-meta">type:${c.metadata.chunk_type||"?"} · lang:${c.metadata.lang||"?"} · page:${c.metadata.page||"?"}</div>
+      </div>`).join("");
+  }
 
-    async function feedback(vote) {
-      const fd = new FormData();
-      fd.append("session_id", SID); fd.append("question", last.q);
-      fd.append("answer", last.a); fd.append("vote", vote);
-      try { await fetch("/feedback", { method: "POST", body: fd }); } catch (_) {}
-      document.getElementById("fb").innerHTML =
-        '<span class="muted">Thanks — feedback recorded.</span>';
+  async function viewChunk(id) {
+    switchTab("chunks");
+    document.getElementById("chunkDetail").style.display = "block";
+    document.getElementById("chunkContent").textContent = "Loading…";
+    try {
+      const r = await fetch(`/chunks/${id}`);
+      const j = await r.json();
+      if (j.error) { document.getElementById("chunkContent").textContent = j.error; return; }
+      document.getElementById("chunkContent").textContent = j.content;
+      const refs = (j.source_refs||[]).map(r => r.filename||r.source||JSON.stringify(r)).join(", ");
+      document.getElementById("chunkMeta").textContent =
+        `id:${j.id} · doc:${j.doc_id} · type:${(j.metadata||{}).chunk_type||"?"} · page:${(j.metadata||{}).page||"?"} · sources:${refs||"none"}`;
+    } catch (e) {
+      document.getElementById("chunkContent").textContent = "Error: " + e.message;
     }
+  }
 
-    // ── Chunk inspector ──────────────────────────────────────────────────
-    async function loadChunks() {
-      const docId = document.getElementById("chunkDocId").value.trim();
-      const url = docId ? `/chunks?doc_id=${encodeURIComponent(docId)}&limit=100` : "/chunks?limit=100";
-      const el = document.getElementById("chunkList");
-      el.innerHTML = '<span class="spinner"></span>';
-      try {
-        const r = await fetch(url);
-        const j = await r.json();
-        _renderChunks(j, el);
-      } catch (e) {
-        el.innerHTML = `<span class="muted">Error: ${e.message}</span>`;
-      }
+  // ── Knowledge graph ───────────────────────────────────────────────────
+  const NODE_COLOR = { engine:"#3fd07a", part:"#9aa7b5", symptom:"#f0a830", cause:"#e5484d", fix:"#56a6ff" };
+  let _graphData = null;
+
+  async function loadGraph() {
+    try {
+      const r = await fetch("/graph");
+      _graphData = await r.json();
+    } catch { return; }
+    _renderGraph(_graphData);
+  }
+
+  function _renderGraph(data) {
+    const svg = d3.select("#graphSvg");
+    svg.selectAll("*").remove();
+    const empty = document.getElementById("graphEmpty");
+    if (!data || !data.nodes || !data.nodes.length) {
+      empty.style.display = "block";
+      empty.textContent = "No graph nodes yet — ingest documents to build the knowledge graph";
+      document.getElementById("graphCanvas").style.display = "none";
+      return;
     }
+    empty.style.display = "none";
+    document.getElementById("graphCanvas").style.display = "block";
+    const W = document.getElementById("graphCanvas").clientWidth || 800, H = 460;
+    svg.attr("viewBox", `0 0 ${W} ${H}`);
+    const sim = d3.forceSimulation(data.nodes)
+      .force("link", d3.forceLink(data.edges).id(d => d.id).distance(90))
+      .force("charge", d3.forceManyBody().strength(-200))
+      .force("center", d3.forceCenter(W/2, H/2))
+      .force("collision", d3.forceCollide(28));
+    const link = svg.append("g").selectAll("line").data(data.edges).join("line").attr("class","link").attr("stroke-width",1.5);
+    const llab = svg.append("g").selectAll("text").data(data.edges).join("text").attr("class","link-label").text(d => d.relation);
+    const node = svg.append("g").selectAll("g").data(data.nodes).join("g").attr("class","node")
+      .call(d3.drag()
+        .on("start",(ev,d)=>{ if(!ev.active) sim.alphaTarget(.3).restart(); d.fx=d.x; d.fy=d.y; })
+        .on("drag", (ev,d)=>{ d.fx=ev.x; d.fy=ev.y; })
+        .on("end",  (ev,d)=>{ if(!ev.active) sim.alphaTarget(0); d.fx=null; d.fy=null; }));
+    node.append("circle").attr("r",13).attr("fill",d=>NODE_COLOR[d.type]||"#66727e");
+    node.append("text").attr("dy",23).attr("text-anchor","middle").text(d=>d.name.length>15?d.name.slice(0,13)+"…":d.name);
+    node.append("title").text(d=>`[${d.type}] ${d.name}`);
+    sim.on("tick",()=>{
+      link.attr("x1",d=>d.source.x).attr("y1",d=>d.source.y).attr("x2",d=>d.target.x).attr("y2",d=>d.target.y);
+      llab.attr("x",d=>(d.source.x+d.target.x)/2).attr("y",d=>(d.source.y+d.target.y)/2);
+      node.attr("transform",d=>`translate(${d.x},${d.y})`);
+    });
+  }
 
-    function _renderChunks(j, el) {
-      el = el || document.getElementById("chunkList");
-      if (!el) return;
-      if (!j.chunks || !j.chunks.length) {
-        el.innerHTML = '<span class="muted">No chunks found. Upload a document first.</span>';
-        return;
-      }
-      el.innerHTML = j.chunks.map(c => `
-        <div class="chunk-row" onclick="viewChunk(${c.id})">
-          <strong>[${c.id}]</strong> <span style="color:var(--accent)">${c.doc_id}</span>
-          — ${c.snippet}…
-          <div class="chunk-meta">type: ${c.metadata.chunk_type || c.metadata.type || "?"} · lang: ${c.metadata.lang || "?"}</div>
-        </div>`).join("");
+  // ── Entities ──────────────────────────────────────────────────────────
+  const ENTITY_CLS = { engine:"entity-engine",part:"entity-part",symptom:"entity-symptom",cause:"entity-cause",fix:"entity-fix",spec:"entity-spec",unit:"entity-unit" };
+
+  async function loadEntities() {
+    const el = document.getElementById("entitiesContent");
+    el.innerHTML = '<span class="spinner"></span>';
+    try {
+      const r = await fetch("/entities");
+      const j = await r.json();
+      _renderEntities(j, el);
+    } catch (e) {
+      el.innerHTML = `<span class="muted">Error: ${e.message}</span>`;
     }
+  }
 
-    async function viewChunk(id) {
-      // Switch to chunks tab
-      switchTab("chunks");
-      document.getElementById("chunkDetail").style.display = "block";
-      document.getElementById("chunkContent").textContent = "Loading…";
-      try {
-        const r = await fetch(`/chunks/${id}`);
-        const j = await r.json();
-        if (j.error) { document.getElementById("chunkContent").textContent = j.error; return; }
-        document.getElementById("chunkContent").textContent = j.content;
-        const refs = (j.source_refs || []).map(r => r.filename || r.source || JSON.stringify(r)).join(", ");
-        document.getElementById("chunkMeta").textContent =
-          `id:${j.id} · doc_id:${j.doc_id} · type:${j.metadata.chunk_type || "?"} · sources: ${refs || "none"}`;
-      } catch (e) {
-        document.getElementById("chunkContent").textContent = "Error: " + e.message;
-      }
+  function _renderEntities(j, el) {
+    el = el || document.getElementById("entitiesContent");
+    if (!el) return;
+    if ((!j.entities||!j.entities.length) && (!j.tags||!j.tags.length)) {
+      el.innerHTML = '<p class="muted" style="padding:16px 0">No entities extracted yet. Entities are extracted by the LLM during ingestion — they appear here after uploading documents with Ollama running.</p>';
+      return;
     }
-
-    // ── Knowledge graph ──────────────────────────────────────────────────
-    const NODE_COLOR = {
-      engine:"#b45309", part:"#15803d", symptom:"#1d4ed8", cause:"#7c3aed", fix:"#0f766e"
-    };
-    let _graphData = null;
-
-    async function loadGraph() {
-      try {
-        const r = await fetch("/graph");
-        _graphData = await r.json();
-      } catch (e) {
-        document.getElementById("graphEmpty").style.display = "block";
-        return;
-      }
-      _renderGraph(_graphData);
+    let html = "";
+    if (j.entities&&j.entities.length) {
+      html += '<div style="margin-bottom:14px"><div class="lbl" style="margin-bottom:8px">Entities</div><div>';
+      html += j.entities.map(e => `<span class="entity-pill ${ENTITY_CLS[e.type]||"entity-default"}" title="${e.type}">${e.name} <span style="opacity:.5">×${e.count}</span></span>`).join("");
+      html += "</div></div>";
     }
-
-    function _renderGraph(data) {
-      const svg = d3.select("#graphSvg");
-      svg.selectAll("*").remove();
-
-      if (!data || !data.nodes || !data.nodes.length) {
-        document.getElementById("graphEmpty").style.display = "block";
-        document.getElementById("graphEmpty").textContent =
-          "No graph nodes yet — knowledge graph is built when documents are ingested with Ollama running.";
-        document.getElementById("graphCanvas").style.display = "none";
-        return;
-      }
-      document.getElementById("graphEmpty").style.display = "none";
-      document.getElementById("graphCanvas").style.display = "block";
-
-      const W = document.getElementById("graphCanvas").clientWidth || 800;
-      const H = 420;
-      svg.attr("viewBox", `0 0 ${W} ${H}`);
-
-      const simulation = d3.forceSimulation(data.nodes)
-        .force("link", d3.forceLink(data.edges).id(d => d.id).distance(90))
-        .force("charge", d3.forceManyBody().strength(-180))
-        .force("center", d3.forceCenter(W / 2, H / 2))
-        .force("collision", d3.forceCollide(28));
-
-      const link = svg.append("g").selectAll("line")
-        .data(data.edges).join("line")
-        .attr("class", "link").attr("stroke-width", 1.5);
-
-      const linkLabel = svg.append("g").selectAll("text")
-        .data(data.edges).join("text")
-        .attr("class", "link-label")
-        .text(d => d.relation);
-
-      const node = svg.append("g").selectAll("g")
-        .data(data.nodes).join("g")
-        .attr("class", "node")
-        .call(d3.drag()
-          .on("start", (event, d) => { if (!event.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
-          .on("drag",  (event, d) => { d.fx = event.x; d.fy = event.y; })
-          .on("end",   (event, d) => { if (!event.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }));
-
-      node.append("circle").attr("r", 14).attr("fill", d => NODE_COLOR[d.type] || "#78716c");
-      node.append("text").attr("dy", 24).attr("text-anchor", "middle")
-        .text(d => d.name.length > 16 ? d.name.slice(0, 14) + "…" : d.name);
-      node.append("title").text(d => `[${d.type}] ${d.name}`);
-
-      simulation.on("tick", () => {
-        link.attr("x1", d => d.source.x).attr("y1", d => d.source.y)
-            .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
-        linkLabel.attr("x", d => (d.source.x + d.target.x) / 2)
-                 .attr("y", d => (d.source.y + d.target.y) / 2);
-        node.attr("transform", d => `translate(${d.x},${d.y})`);
-      });
+    if (j.tags&&j.tags.length) {
+      html += '<div><div class="lbl" style="margin-bottom:8px">Tags</div><div>';
+      html += j.tags.map(t => `<span class="tag-chip">${t.tag} <span style="opacity:.5">×${t.count}</span></span>`).join("");
+      html += "</div></div>";
     }
+    el.innerHTML = html;
+  }
 
-    // ── Entities ─────────────────────────────────────────────────────────
-    const ENTITY_CLASS = {
-      engine:"entity-engine", part:"entity-part", symptom:"entity-symptom",
-      cause:"entity-cause", fix:"entity-fix", spec:"entity-spec", unit:"entity-unit"
-    };
-
-    async function loadEntities() {
-      const el = document.getElementById("entitiesContent");
-      el.innerHTML = '<span class="spinner"></span>';
-      try {
-        const r = await fetch("/entities");
-        const j = await r.json();
-        _renderEntities(j, el);
-      } catch (e) {
-        el.innerHTML = `<span class="muted">Error: ${e.message}</span>`;
-      }
+  // ── Gaps ──────────────────────────────────────────────────────────────
+  async function loadGaps() {
+    const el = document.getElementById("gapsList");
+    el.innerHTML = '<span class="spinner"></span>';
+    try {
+      const r = await fetch("/gaps");
+      const j = await r.json();
+      _renderGaps(j, el);
+      document.getElementById("gapBadge").textContent = (j.gaps||[]).length || "—";
+    } catch (e) {
+      el.innerHTML = `<span class="muted">Error: ${e.message}</span>`;
     }
+  }
 
-    function _renderEntities(j, el) {
-      el = el || document.getElementById("entitiesContent");
-      if (!el) return;
-      if ((!j.entities || !j.entities.length) && (!j.tags || !j.tags.length)) {
-        el.innerHTML = '<div class="muted" style="padding:24px 0">No entities extracted yet. ' +
-          'Entities are extracted by the LLM during ingestion — they appear here after you upload ' +
-          'documents with Ollama running (<code>ollama serve</code> + <code>ollama pull qwen3:8b</code>).</div>';
-        return;
-      }
-      let html = "";
-      if (j.entities && j.entities.length) {
-        html += '<div style="margin-bottom:12px"><strong style="font-size:13px">Entities</strong> <span class="muted">(type · name · count)</span><div style="margin-top:8px">';
-        html += j.entities.map(e => {
-          const cls = ENTITY_CLASS[e.type] || "entity-default";
-          return `<span class="entity-pill ${cls}" title="${e.type}">${e.name} <span style="opacity:0.6">×${e.count}</span></span>`;
-        }).join("");
-        html += "</div></div>";
-      }
-      if (j.tags && j.tags.length) {
-        html += '<div><strong style="font-size:13px">Tags</strong><div style="margin-top:8px">';
-        html += j.tags.map(t =>
-          `<span class="tag-chip">${t.tag} <span style="opacity:0.6">×${t.count}</span></span>`
-        ).join("");
-        html += "</div></div>";
-      }
-      el.innerHTML = html;
+  function _renderGaps(j, el) {
+    el = el || document.getElementById("gapsList");
+    if (!el) return;
+    if (!j.gaps||!j.gaps.length) {
+      el.innerHTML = '<p class="muted" style="padding:16px 0">No open gaps. Ask questions to generate knowledge gaps when the evidence is weak.</p>';
+      return;
     }
+    el.innerHTML = j.gaps.map(g => `
+      <div class="gap-row" id="gap-${g.id}">
+        <div class="gap-question">
+          <strong>Q:</strong> ${g.question}
+          <div class="gap-reason">${g.reason} · ${new Date(g.created_at).toLocaleDateString()}</div>
+        </div>
+        <button class="btn sm" onclick="resolveGap(${g.id})">Resolve</button>
+      </div>`).join("");
+  }
 
-    // ── Gaps dashboard ───────────────────────────────────────────────────
-    async function loadGaps() {
-      const el = document.getElementById("gapsList");
-      el.innerHTML = '<span class="spinner"></span>';
-      try {
-        const r = await fetch("/gaps");
-        const j = await r.json();
-        _renderGaps(j, el);
-      } catch (e) {
-        el.innerHTML = `<span class="muted">Error: ${e.message}</span>`;
-      }
-    }
+  async function resolveGap(id) {
+    try {
+      await fetch(`/gaps/${id}/resolve`, { method: "POST" });
+      const row = document.getElementById("gap-" + id);
+      if (row) { row.style.opacity = ".35"; row.querySelector("button").disabled = true; }
+    } catch (e) { alert("Failed: " + e.message); }
+  }
 
-    function _renderGaps(j, el) {
-      el = el || document.getElementById("gapsList");
-      if (!el) return;
-      if (!j.gaps || !j.gaps.length) {
-        el.innerHTML = '<div class="muted" style="padding:24px 0">No open gaps. ' +
-          'Gaps are logged when the verifier detects an unanswered question — ask something and check back.</div>';
-        return;
-      }
-      el.innerHTML = j.gaps.map(g => `
-        <div class="gap-row" id="gap-${g.id}">
-          <div class="gap-question">
-            <strong>Q:</strong> ${g.question}
-            <div class="gap-reason">${g.reason} · ${new Date(g.created_at).toLocaleDateString()}</div>
-          </div>
-          <button class="small secondary" onclick="resolveGap(${g.id})">Resolve</button>
-        </div>`).join("");
-    }
-
-    async function resolveGap(id) {
-      try {
-        await fetch(`/gaps/${id}/resolve`, { method: "POST" });
-        const row = document.getElementById("gap-" + id);
-        if (row) { row.style.opacity = "0.4"; row.querySelector("button").disabled = true; }
-      } catch (e) {
-        alert("Failed to resolve gap: " + e.message);
-      }
-    }
-  </script>
+  // Initial data refresh
+  _refreshAllDataTabs();
+</script>
 </body>
 </html>

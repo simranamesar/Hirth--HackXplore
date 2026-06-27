@@ -19,7 +19,14 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 @app.get("/")
-def index() -> FileResponse:
+def landing() -> FileResponse:
+    """Serve the landing page."""
+    return FileResponse(STATIC_DIR / "landing.html")
+
+
+@app.get("/app")
+def app_page() -> FileResponse:
+    """Serve the main application UI."""
     return FileResponse(STATIC_DIR / "index.html")
 
 
