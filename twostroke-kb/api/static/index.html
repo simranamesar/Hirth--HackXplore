@@ -258,9 +258,24 @@
         el.textContent = j.error
           ? "Error: " + j.error
           : `✓ ${j.filename} v${j.version || 1} — ${j.chunks} chunks, ${j.facts} facts (${j.skipped_duplicates} dupes skipped)`;
+        // Auto-refresh data tabs after a successful upload
+        if (!j.error) {
+          // Small delay to let async enrichment settle
+          setTimeout(() => {
+            _refreshAllDataTabs();
+          }, 1500);
+        }
       } catch (e) {
         el.textContent = "Upload failed: " + e.message;
       }
+    }
+
+    function _refreshAllDataTabs() {
+      // Silently pre-fetch so tabs show data immediately when switched to
+      fetch("/chunks?limit=100").then(r => r.json()).then(j => _renderChunks(j)).catch(() => {});
+      fetch("/graph").then(r => r.json()).then(j => { _graphData = j; }).catch(() => {});
+      fetch("/entities").then(r => r.json()).then(j => _renderEntities(j)).catch(() => {});
+      fetch("/gaps").then(r => r.json()).then(j => _renderGaps(j)).catch(() => {});
     }
 
     // ── Ask / stream ─────────────────────────────────────────────────────
@@ -354,9 +369,9 @@
 
       const cites = (ev.citations || []).map(c => {
         const loc = c.page ? ` p.${c.page}` : "";
-        // Evidence anchor: link to /chunks/{id} if id present
+        // Evidence anchor: real URL so "open in new tab" works
         const anchor = c.id
-          ? `<a href="#" onclick="viewChunk(${c.id});return false">View source ↗</a>`
+          ? `<a href="/chunks/${c.id}/view" target="_blank" rel="noopener">View source ↗</a>`
           : "";
         return `<div class="cite">
           <strong>[${c.n}]</strong> ${c.filename || c.doc_id}${loc} ${anchor}<br>
@@ -396,19 +411,25 @@
       try {
         const r = await fetch(url);
         const j = await r.json();
-        if (!j.chunks || !j.chunks.length) {
-          el.innerHTML = '<span class="muted">No chunks found.</span>';
-          return;
-        }
-        el.innerHTML = j.chunks.map(c => `
-          <div class="chunk-row" onclick="viewChunk(${c.id})">
-            <strong>[${c.id}]</strong> <span style="color:var(--accent)">${c.doc_id}</span>
-            — ${c.snippet}…
-            <div class="chunk-meta">type: ${c.metadata.chunk_type || c.metadata.type || "?"} · lang: ${c.metadata.lang || "?"}</div>
-          </div>`).join("");
+        _renderChunks(j, el);
       } catch (e) {
         el.innerHTML = `<span class="muted">Error: ${e.message}</span>`;
       }
+    }
+
+    function _renderChunks(j, el) {
+      el = el || document.getElementById("chunkList");
+      if (!el) return;
+      if (!j.chunks || !j.chunks.length) {
+        el.innerHTML = '<span class="muted">No chunks found. Upload a document first.</span>';
+        return;
+      }
+      el.innerHTML = j.chunks.map(c => `
+        <div class="chunk-row" onclick="viewChunk(${c.id})">
+          <strong>[${c.id}]</strong> <span style="color:var(--accent)">${c.doc_id}</span>
+          — ${c.snippet}…
+          <div class="chunk-meta">type: ${c.metadata.chunk_type || c.metadata.type || "?"} · lang: ${c.metadata.lang || "?"}</div>
+        </div>`).join("");
     }
 
     async function viewChunk(id) {
@@ -433,22 +454,27 @@
     const NODE_COLOR = {
       engine:"#b45309", part:"#15803d", symptom:"#1d4ed8", cause:"#7c3aed", fix:"#0f766e"
     };
+    let _graphData = null;
 
     async function loadGraph() {
-      const svg = d3.select("#graphSvg");
-      svg.selectAll("*").remove();
-
-      let data;
       try {
         const r = await fetch("/graph");
-        data = await r.json();
+        _graphData = await r.json();
       } catch (e) {
         document.getElementById("graphEmpty").style.display = "block";
         return;
       }
+      _renderGraph(_graphData);
+    }
 
-      if (!data.nodes || !data.nodes.length) {
+    function _renderGraph(data) {
+      const svg = d3.select("#graphSvg");
+      svg.selectAll("*").remove();
+
+      if (!data || !data.nodes || !data.nodes.length) {
         document.getElementById("graphEmpty").style.display = "block";
+        document.getElementById("graphEmpty").textContent =
+          "No graph nodes yet — knowledge graph is built when documents are ingested with Ollama running.";
         document.getElementById("graphCanvas").style.display = "none";
         return;
       }
@@ -460,8 +486,7 @@
       svg.attr("viewBox", `0 0 ${W} ${H}`);
 
       const simulation = d3.forceSimulation(data.nodes)
-        .force("link", d3.forceLink(data.edges)
-          .id(d => d.id).distance(90))
+        .force("link", d3.forceLink(data.edges).id(d => d.id).distance(90))
         .force("charge", d3.forceManyBody().strength(-180))
         .force("center", d3.forceCenter(W / 2, H / 2))
         .force("collision", d3.forceCollide(28));
@@ -483,23 +508,16 @@
           .on("drag",  (event, d) => { d.fx = event.x; d.fy = event.y; })
           .on("end",   (event, d) => { if (!event.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }));
 
-      node.append("circle")
-        .attr("r", 14)
-        .attr("fill", d => NODE_COLOR[d.type] || "#78716c");
-
-      node.append("text")
-        .attr("dy", 24).attr("text-anchor", "middle")
+      node.append("circle").attr("r", 14).attr("fill", d => NODE_COLOR[d.type] || "#78716c");
+      node.append("text").attr("dy", 24).attr("text-anchor", "middle")
         .text(d => d.name.length > 16 ? d.name.slice(0, 14) + "…" : d.name);
-
       node.append("title").text(d => `[${d.type}] ${d.name}`);
 
       simulation.on("tick", () => {
-        link
-          .attr("x1", d => d.source.x).attr("y1", d => d.source.y)
-          .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
-        linkLabel
-          .attr("x", d => (d.source.x + d.target.x) / 2)
-          .attr("y", d => (d.source.y + d.target.y) / 2);
+        link.attr("x1", d => d.source.x).attr("y1", d => d.source.y)
+            .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+        linkLabel.attr("x", d => (d.source.x + d.target.x) / 2)
+                 .attr("y", d => (d.source.y + d.target.y) / 2);
         node.attr("transform", d => `translate(${d.x},${d.y})`);
       });
     }
@@ -516,35 +534,38 @@
       try {
         const r = await fetch("/entities");
         const j = await r.json();
-
-        if ((!j.entities || !j.entities.length) && (!j.tags || !j.tags.length)) {
-          el.innerHTML = '<div id="entitiesEmpty">No entities yet — upload and index documents to extract engine knowledge.</div>';
-          return;
-        }
-
-        let html = "";
-
-        if (j.entities && j.entities.length) {
-          html += '<div style="margin-bottom:12px"><strong style="font-size:13px">Entities</strong> <span class="muted">(type · name · count)</span><div style="margin-top:8px">';
-          html += j.entities.map(e => {
-            const cls = ENTITY_CLASS[e.type] || "entity-default";
-            return `<span class="entity-pill ${cls}" title="${e.type}">${e.name} <span style="opacity:0.6">×${e.count}</span></span>`;
-          }).join("");
-          html += "</div></div>";
-        }
-
-        if (j.tags && j.tags.length) {
-          html += '<div><strong style="font-size:13px">Tags</strong><div style="margin-top:8px">';
-          html += j.tags.map(t =>
-            `<span class="tag-chip">${t.tag} <span style="opacity:0.6">×${t.count}</span></span>`
-          ).join("");
-          html += "</div></div>";
-        }
-
-        el.innerHTML = html;
+        _renderEntities(j, el);
       } catch (e) {
         el.innerHTML = `<span class="muted">Error: ${e.message}</span>`;
       }
+    }
+
+    function _renderEntities(j, el) {
+      el = el || document.getElementById("entitiesContent");
+      if (!el) return;
+      if ((!j.entities || !j.entities.length) && (!j.tags || !j.tags.length)) {
+        el.innerHTML = '<div class="muted" style="padding:24px 0">No entities extracted yet. ' +
+          'Entities are extracted by the LLM during ingestion — they appear here after you upload ' +
+          'documents with Ollama running (<code>ollama serve</code> + <code>ollama pull qwen3:8b</code>).</div>';
+        return;
+      }
+      let html = "";
+      if (j.entities && j.entities.length) {
+        html += '<div style="margin-bottom:12px"><strong style="font-size:13px">Entities</strong> <span class="muted">(type · name · count)</span><div style="margin-top:8px">';
+        html += j.entities.map(e => {
+          const cls = ENTITY_CLASS[e.type] || "entity-default";
+          return `<span class="entity-pill ${cls}" title="${e.type}">${e.name} <span style="opacity:0.6">×${e.count}</span></span>`;
+        }).join("");
+        html += "</div></div>";
+      }
+      if (j.tags && j.tags.length) {
+        html += '<div><strong style="font-size:13px">Tags</strong><div style="margin-top:8px">';
+        html += j.tags.map(t =>
+          `<span class="tag-chip">${t.tag} <span style="opacity:0.6">×${t.count}</span></span>`
+        ).join("");
+        html += "</div></div>";
+      }
+      el.innerHTML = html;
     }
 
     // ── Gaps dashboard ───────────────────────────────────────────────────
@@ -554,21 +575,28 @@
       try {
         const r = await fetch("/gaps");
         const j = await r.json();
-        if (!j.gaps || !j.gaps.length) {
-          el.innerHTML = '<div id="gapsEmpty">No open gaps. 🎉</div>';
-          return;
-        }
-        el.innerHTML = j.gaps.map(g => `
-          <div class="gap-row" id="gap-${g.id}">
-            <div class="gap-question">
-              <strong>Q:</strong> ${g.question}
-              <div class="gap-reason">${g.reason} · ${new Date(g.created_at).toLocaleDateString()}</div>
-            </div>
-            <button class="small secondary" onclick="resolveGap(${g.id})">Resolve</button>
-          </div>`).join("");
+        _renderGaps(j, el);
       } catch (e) {
         el.innerHTML = `<span class="muted">Error: ${e.message}</span>`;
       }
+    }
+
+    function _renderGaps(j, el) {
+      el = el || document.getElementById("gapsList");
+      if (!el) return;
+      if (!j.gaps || !j.gaps.length) {
+        el.innerHTML = '<div class="muted" style="padding:24px 0">No open gaps. ' +
+          'Gaps are logged when the verifier detects an unanswered question — ask something and check back.</div>';
+        return;
+      }
+      el.innerHTML = j.gaps.map(g => `
+        <div class="gap-row" id="gap-${g.id}">
+          <div class="gap-question">
+            <strong>Q:</strong> ${g.question}
+            <div class="gap-reason">${g.reason} · ${new Date(g.created_at).toLocaleDateString()}</div>
+          </div>
+          <button class="small secondary" onclick="resolveGap(${g.id})">Resolve</button>
+        </div>`).join("");
     }
 
     async function resolveGap(id) {

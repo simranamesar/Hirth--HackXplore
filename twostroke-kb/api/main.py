@@ -105,8 +105,26 @@ def _stream_answer(
 
     yield _sse({"type": "thinking", "text": "Searching knowledge base…"})
 
+    # Load prior conversation for context-aware answers
+    history_note = ""
     try:
-        chunks = search(question, k=settings.retrieve_top_k)
+        from memory.store import get_conversation
+        turns = get_conversation(session_id)
+        if turns:
+            recent = turns[-4:]
+            history_parts = [
+                f"{t.get('role','').capitalize()}: {str(t.get('content',''))[:300]}"
+                for t in recent
+            ]
+            history_note = "\n\nPrior conversation:\n" + "\n".join(history_parts)
+    except Exception:
+        pass
+
+    # Use question + history for retrieval so follow-ups find relevant chunks
+    search_query = question + (" " + history_note if history_note else "")
+
+    try:
+        chunks = search(search_query, k=settings.retrieve_top_k)
     except Exception:
         chunks = []
 
@@ -161,9 +179,11 @@ def _stream_answer(
                 "You are TwoStrokeGPT, an expert on two-stroke engines. "
                 "Answer ONLY using the numbered sources below. "
                 "Cite each fact as [Source N] immediately after the claim. "
-                "Never invent or estimate numeric values."
+                "Never invent or estimate numeric values. "
+                "Provide a COMPLETE answer — do not truncate or end mid-sentence."
                 + expertise_note
                 + lang_note
+                + ("\n\n" + history_note.strip() if history_note else "")
                 + "\n\nSources:\n"
                 + "\n\n".join(context_lines)
             ),
@@ -173,7 +193,7 @@ def _stream_answer(
 
     full_answer = ""
     try:
-        for token in stream_chat(messages, temperature=0.1, max_tokens=1024):
+        for token in stream_chat(messages, temperature=0.1, max_tokens=2048):
             full_answer += token
             yield _sse({"type": "delta", "text": token})
     except Exception as exc:
@@ -186,9 +206,9 @@ def _stream_answer(
     except Exception:
         grounded = False
 
-    # Related questions
+    # Related questions — pass full question with history for better suggestions
     try:
-        related_qs = get_related(question, chunks)
+        related_qs = get_related(question + (history_note or ""), chunks)
     except Exception:
         related_qs = []
 
@@ -404,6 +424,57 @@ def list_chunks(doc_id: str | None = None, limit: int = 50) -> JSONResponse:
         })
     except Exception as exc:
         return JSONResponse({"chunks": [], "error": str(exc)})
+
+
+@app.get("/chunks/{chunk_id}/view")
+def view_chunk_html(chunk_id: int):
+    """Render a standalone HTML page for a single chunk (evidence anchor, opens in new tab)."""
+    from fastapi.responses import HTMLResponse
+    from config import get_connection
+    import json as _j
+
+    try:
+        conn = get_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT id, doc_id, content, metadata, source_refs FROM chunks WHERE id = %s",
+                (chunk_id,),
+            )
+            row = cur.fetchone()
+        finally:
+            conn.close()
+
+        if not row:
+            return HTMLResponse("<h2>Chunk not found</h2>", status_code=404)
+
+        meta = row[3] if isinstance(row[3], dict) else _j.loads(row[3] or "{}")
+        refs = row[4] if isinstance(row[4], list) else _j.loads(row[4] or "[]")
+        ref_str = ", ".join(r.get("filename") or r.get("source") or str(r) for r in refs) or "—"
+        content_escaped = row[2].replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+
+        html = f"""<!doctype html><html lang="en"><head>
+<meta charset="utf-8"/><title>Chunk {row[0]} — {row[1]}</title>
+<style>
+  body{{font-family:ui-sans-serif,system-ui,sans-serif;max-width:860px;margin:40px auto;padding:0 24px;color:#1c1917;background:#fafaf9}}
+  h2{{font-size:18px;margin-bottom:4px}}
+  .meta{{font-size:12px;color:#78716c;margin-bottom:20px}}
+  pre{{background:#f5f5f4;border-radius:8px;padding:16px;white-space:pre-wrap;word-break:break-word;line-height:1.6;font-size:14px}}
+  a{{color:#b45309}}
+</style></head><body>
+<h2>Chunk #{row[0]} — <code>{row[1]}</code></h2>
+<div class="meta">
+  type: {meta.get("chunk_type", meta.get("type","?"))} &nbsp;|&nbsp;
+  lang: {meta.get("lang","?")} &nbsp;|&nbsp;
+  sources: {content_escaped[:0] or ref_str}
+  <br>sources: {ref_str}
+</div>
+<pre>{content_escaped}</pre>
+<p><a href="javascript:history.back()">← Back</a></p>
+</body></html>"""
+        return HTMLResponse(html)
+    except Exception as exc:
+        return HTMLResponse(f"<h2>Error: {exc}</h2>", status_code=500)
 
 
 @app.get("/chunks/{chunk_id}")
