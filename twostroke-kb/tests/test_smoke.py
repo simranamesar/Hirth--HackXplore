@@ -594,6 +594,47 @@ def test_source_viewer_not_found():
 
 # --- Slice 6: graph_builder, graph_lookup, diagnostic_tree, expertise mode --
 
+def test_kg_ontology_seed_graph_is_valid_and_repeatable():
+    """Manual seed graph has valid ontology types and stable node identity."""
+    from ingestion.kg_ontology import EDGE_TYPES, NODE_TYPES, is_valid_seed_graph, seed_graph
+
+    first = seed_graph()
+    second = seed_graph()
+
+    assert is_valid_seed_graph(first)
+    assert first == second
+    assert any(n["type"] == "system" and n["name"] == "Ignition System" for n in first["nodes"])
+    assert any(n["type"] == "part" and n["name"] == "Spark Plug" for n in first["nodes"])
+    assert any(n["type"] == "symptom" and n["name"] == "Won't Start" for n in first["nodes"])
+    assert all(n["type"] in NODE_TYPES for n in first["nodes"])
+    assert all(e["relation"] in EDGE_TYPES for e in first["edges"])
+
+
+def test_kg_normalizer_canonicalizes_synonyms_and_rejects_noise():
+    """Common Hirth/two-stroke terms merge; obvious document noise is rejected."""
+    from ingestion.kg_normalizer import classify_entity_type, normalize_entity
+
+    assert not normalize_entity("July 2013", "engine")["is_valid"]
+    assert not normalize_entity("p. 12", "engine")["is_valid"]
+
+    for raw in ("spark plug", "plug", "Zündkerze"):
+        result = normalize_entity(raw, "part")
+        assert result["is_valid"]
+        assert result["canonical_name"] == "Spark Plug"
+        assert result["type"] == "part"
+
+    for raw in ("carburettor", "Vergaser"):
+        result = normalize_entity(raw, "part")
+        assert result["is_valid"]
+        assert result["canonical_name"] == "Carburetor"
+        assert result["type"] == "part"
+
+    assert normalize_entity("700°C", "part")["type"] == "spec"
+    assert normalize_entity("150 hours", "engine")["type"] == "spec"
+    assert normalize_entity("Hirth 3503", "engine")["type"] == "engine"
+    assert classify_entity_type("Hirth 3503") == "engine"
+
+
 def test_graph_builder_calls_llm_and_upserts():
     """graph_builder.extract() calls the LLM and attempts DB upsert."""
     from unittest.mock import MagicMock, patch
@@ -627,6 +668,258 @@ def test_graph_builder_calls_llm_and_upserts():
 
     # Should have called execute for node inserts + edge insert
     assert mock_cur.execute.call_count >= 2
+
+
+def test_graph_builder_uses_later_chunks_for_kg_extraction():
+    """KG extraction uses selected chunks, not only the document prefix."""
+    from unittest.mock import patch
+    from ingestion.types import ParsedDoc
+
+    doc = ParsedDoc(
+        text="A" * 2000,
+        metadata={"filename": "manual.pdf", "type": "pdf"},
+        source_ref={"filename": "manual.pdf"},
+    )
+    chunks = [
+        {
+            "content": "A" * 700,
+            "metadata": {"filename": "manual.pdf", "chunk_index": 0, "page": 1},
+            "source_refs": [{"filename": "manual.pdf", "page": 1}],
+        },
+        {
+            "content": "Troubleshooting: check the spark plug if Hirth 3503 misfires at 700°C.",
+            "metadata": {"filename": "manual.pdf", "chunk_index": 7, "page": 9},
+            "source_refs": [{"filename": "manual.pdf", "page": 9}],
+        },
+    ]
+    captured = {"nodes": [], "edges": []}
+
+    def fake_upsert(nodes, edges):
+        captured["nodes"].extend(nodes)
+        captured["edges"].extend(edges)
+        return {
+            "nodes_inserted": len(nodes),
+            "edges_inserted": len(edges),
+            "nodes_rejected": 0,
+            "edges_rejected": 0,
+        }
+
+    with patch("ingestion.graph_builder._seed", return_value={
+        "nodes_inserted": 0,
+        "edges_inserted": 0,
+        "nodes_rejected": 0,
+        "edges_rejected": 0,
+    }), patch("ingestion.graph_builder._upsert", side_effect=fake_upsert):
+        from ingestion import graph_builder
+        stats = graph_builder.extract(doc, chunks=chunks)
+
+    assert stats["chunks_considered"] == 2
+    assert stats["chunks_selected"] == 2
+    assert any(n["name"] == "Spark Plug" for n in captured["nodes"])
+    assert any(n["type"] == "spec" and "700" in n["name"] for n in captured["nodes"])
+    assert any(e["props"].get("source_chunk_id") == 7 for e in captured["edges"])
+
+
+def test_graph_edge_props_are_validated_and_short():
+    """Graph edge provenance keeps evidence short and validates confidence/method."""
+    from ingestion.graph_builder import make_edge_props
+
+    props = make_edge_props(
+        doc_id="manual.pdf",
+        chunk_id=12,
+        page=3,
+        evidence=(" Spark plug evidence. " * 40),
+        confidence=3.5,
+        extraction_method="not-a-method",
+        extra={"source_title": "Manual"},
+    )
+
+    assert props["doc_id"] == "manual.pdf"
+    assert props["source_chunk_id"] == 12
+    assert props["chunk_id"] == 12
+    assert props["page"] == 3
+    assert props["confidence"] == 1.0
+    assert props["extraction_method"] == "unknown"
+    assert props["source_title"] == "Manual"
+    assert isinstance(props["evidence"], str)
+    assert len(props["evidence"]) <= 300
+
+
+def test_graph_serializers_preserve_backward_compatibility():
+    from api.main import serialize_graph_edge, serialize_graph_node
+
+    node = serialize_graph_node(1, "part", "spark plug", {"aliases": ["plug"], "doc_id": "manual.pdf"})
+    edge = serialize_graph_edge(10, 1, 2, "HAS_SPEC", {})
+
+    assert node["id"] == 1
+    assert node["name"] == "Spark Plug"
+    assert node["label"] == "Spark Plug"
+    assert node["canonical_name"] == "Spark Plug"
+    assert node["doc_ids"] == ["manual.pdf"]
+    assert "props" in node
+
+    assert edge["id"] == 10
+    assert edge["source"] == 1
+    assert edge["target"] == 2
+    assert edge["relation"] == "HAS_SPEC"
+    assert edge["type"] == "HAS_SPEC"
+    assert edge["confidence"] is None
+    assert edge["extraction_method"] == "unknown"
+    assert edge["props"]["evidence"] == ""
+
+
+def test_api_graph_endpoint_supports_filters_and_rich_metadata():
+    from fastapi.testclient import TestClient
+    from unittest.mock import MagicMock, patch
+    from api.main import app
+
+    node_rows = [
+        (1, "part", "Spark Plug", {"doc_id": "manual.pdf", "aliases": ["plug"], "confidence": 0.8}),
+        (2, "spec", "700°C", {"doc_id": "manual.pdf", "confidence": 0.8}),
+        (3, "engine", "July 2013", {}),
+    ]
+    edge_rows = [
+        (10, 1, 2, "HAS_SPEC", {
+            "doc_id": "manual.pdf",
+            "source_chunk_id": 4,
+            "page": 12,
+            "evidence": "Spark plug temperature 700°C.",
+            "confidence": 0.82,
+            "extraction_method": "rule",
+            "source_title": "Manual",
+        }),
+        (11, 1, 2, "RELATED_TO", {
+            "doc_id": "manual.pdf",
+            "confidence": 0.2,
+            "extraction_method": "rule",
+        }),
+    ]
+
+    mock_cur = MagicMock()
+    mock_cur.fetchall.side_effect = [node_rows, edge_rows]
+    mock_conn = MagicMock()
+    mock_conn.cursor.return_value = mock_cur
+
+    with patch("config.get_connection", return_value=mock_conn):
+        client = TestClient(app)
+        resp = client.get(
+            "/graph?edge_type=HAS_SPEC&doc_id=manual.pdf&min_confidence=0.5"
+            "&extraction_method=rule&include_seed=false"
+        )
+
+    data = resp.json()
+    assert resp.status_code == 200
+    assert len(data["edges"]) == 1
+    edge = data["edges"][0]
+    assert edge["id"] == 10
+    assert edge["confidence"] == 0.82
+    assert edge["evidence"] == "Spark plug temperature 700°C."
+    assert edge["source_chunk_id"] == 4
+    assert edge["source_title"] == "Manual"
+    assert data["nodes"][0]["label"] == "Spark Plug"
+    assert data["filters"]["edge_type"] == "HAS_SPEC"
+
+
+def test_graph_diagnostic_paths_endpoint():
+    from fastapi.testclient import TestClient
+    from unittest.mock import patch
+    from api.main import app
+
+    fake = {
+        "intent": {"intent": "diagnostic_cause"},
+        "paths": [{"path": "Misfire --CAUSED_BY--> Spark Plug Fouling"}],
+        "context": "Knowledge Graph evidence:",
+    }
+    with patch("agent.kg_retrieval.retrieve_kg_context", return_value=fake):
+        client = TestClient(app)
+        resp = client.get("/graph/diagnostic-paths?query=misfire")
+
+    data = resp.json()
+    assert resp.status_code == 200
+    assert data["query"] == "misfire"
+    assert data["paths"][0]["path"].startswith("Misfire")
+
+
+def test_kg_retrieval_intent_and_context_formatting():
+    from agent.kg_retrieval import classify_question_intent, format_kg_context
+
+    assert classify_question_intent("Why does the engine misfire?")["intent"] == "diagnostic_cause"
+    assert classify_question_intent("What should I check for overheating?")["intent"] == "diagnostic_fix"
+    assert classify_question_intent("What is the spark plug related to?")["intent"] == "part_lookup"
+    assert classify_question_intent("Tell me about the company")["intent"] == "general_question"
+
+    context = format_kg_context([
+        {
+            "path": "Misfire --CAUSED_BY--> Spark Plug Fouling --FIXED_BY--> Replace Spark Plug",
+            "evidence": "Engine misfire may be caused by spark plug fouling.",
+            "source_title": "Manual",
+            "page": 12,
+            "source_chunk_id": 4,
+            "confidence": 0.86,
+        }
+    ])
+    assert "Knowledge Graph evidence" in context
+    assert "Misfire --CAUSED_BY-->" in context
+    assert "Manual, page 12, chunk 4" in context
+
+
+def test_kg_rules_extract_diagnostic_cause_and_fixes():
+    """Rule extraction works without an LLM for diagnostic snippets."""
+    from ingestion.graph_builder import _chunk_props
+    from ingestion.kg_rules import extract_rules
+
+    chunk = {
+        "content": "Engine misfire may be caused by spark plug fouling. Clean or replace the spark plug.",
+        "metadata": {"filename": "manual.pdf", "chunk_index": 4, "page": 8},
+        "source_refs": [{"filename": "manual.pdf", "page": 8}],
+    }
+
+    result = extract_rules(chunk, _chunk_props)
+    nodes = {(n["type"], n["name"]) for n in result["nodes"]}
+    edges = {(e["src"], e["relation"], e["dst"]) for e in result["edges"]}
+
+    assert ("symptom", "Misfire") in nodes
+    assert ("cause", "Spark Plug Fouling") in nodes
+    assert ("fix", "Clean Spark Plug") in nodes
+    assert ("fix", "Replace Spark Plug") in nodes
+    assert ("part", "Spark Plug") in nodes
+    assert ("Misfire", "CAUSED_BY", "Spark Plug Fouling") in edges
+    assert ("Spark Plug Fouling", "FIXED_BY", "Clean Spark Plug") in edges
+    assert ("Spark Plug Fouling", "FIXED_BY", "Replace Spark Plug") in edges
+    assert all(e["props"]["source_chunk_id"] == 4 for e in result["edges"])
+    assert all(e["props"]["extraction_method"] == "rule" for e in result["edges"])
+
+
+def test_kg_rules_extract_table_specs_and_maintenance():
+    from ingestion.graph_builder import _chunk_props
+    from ingestion.kg_rules import extract_rules
+
+    chunk = {
+        "content": (
+            "symptom | possible cause | correction\n"
+            "rough idle | blocked jet | clean carburetor\n"
+            "Check carburetor idle speed 2200 rpm every 150 hours. "
+            "Warning: do not operate with damaged fuel line."
+        ),
+        "metadata": {"filename": "manual.pdf", "chunk_index": 9, "page": 12, "chunk_type": "table"},
+        "source_refs": [{"filename": "manual.pdf", "page": 12}],
+    }
+
+    result = extract_rules(chunk, _chunk_props)
+    nodes = {(n["type"], n["name"]) for n in result["nodes"]}
+    edges = {(e["src"], e["relation"], e["dst"]) for e in result["edges"]}
+
+    assert ("symptom", "Rough Idle") in nodes
+    assert ("cause", "Blocked Jet") in nodes
+    assert ("fix", "Clean Carburetor") in nodes
+    assert any(node[0] == "spec" and "2200" in node[1] for node in nodes)
+    assert any(node[0] == "spec" and "150" in node[1] for node in nodes)
+    assert ("Rough Idle", "CAUSED_BY", "Blocked Jet") in edges
+    assert ("Blocked Jet", "FIXED_BY", "Clean Carburetor") in edges
+    assert any(e["relation"] == "HAS_SPEC" for e in result["edges"])
+    assert any(e["relation"] == "REQUIRES_PROCEDURE" for e in result["edges"])
+    assert any(e["relation"] == "RELATED_TO" for e in result["edges"])
+    assert all(e["props"]["extraction_method"] in ("rule", "table") for e in result["edges"])
 
 
 def test_graph_answer_beginner_mode():
@@ -830,6 +1123,60 @@ def test_ask_stream_endpoint_sse_format():
     assert "citations" in done
     assert "confidence" in done
     assert "related_questions" in done
+
+
+def test_ask_stream_includes_optional_kg_metadata_and_prompt_context():
+    """Diagnostic ask/stream keeps SSE shape while adding optional KG evidence."""
+    from fastapi.testclient import TestClient
+    from unittest.mock import patch
+    from api.main import app
+
+    chunk = {
+        "id": 1,
+        "doc_id": "manual.pdf",
+        "content": "Engine misfire may be caused by spark plug fouling.",
+        "source_refs": [{"filename": "manual.pdf", "page": 12}],
+        "metadata": {},
+    }
+    kg_result = {
+        "intent": {"intent": "diagnostic_cause", "is_kg_relevant": True, "triggers": ["why"]},
+        "paths": [{
+            "path": "Misfire --CAUSED_BY--> Spark Plug Fouling --FIXED_BY--> Replace Spark Plug",
+            "evidence": "Engine misfire may be caused by spark plug fouling.",
+            "confidence": 0.86,
+            "doc_id": "manual.pdf",
+            "page": 12,
+            "source_chunk_id": 4,
+        }],
+        "graph_evidence": [],
+        "context": "Knowledge Graph evidence:\nPath 1:\nMisfire --CAUSED_BY--> Spark Plug Fouling",
+    }
+
+    def fake_stream_chat(messages, **kwargs):
+        assert "Knowledge Graph evidence" in messages[0]["content"]
+        return iter(["Check ", "the spark plug."])
+
+    with patch("agent.retriever_hybrid.search", return_value=[chunk]), \
+         patch("agent.reranker.rerank", return_value=[chunk]), \
+         patch("agent.kg_retrieval.retrieve_kg_context", return_value=kg_result), \
+         patch("agent.verifier.is_grounded", return_value=True), \
+         patch("agent.recommender.related", return_value=[]), \
+         patch("llm.stream_chat", side_effect=fake_stream_chat):
+        client = TestClient(app)
+        resp = client.post(
+            "/ask/stream",
+            data={"question": "Why does the engine misfire?", "session_id": "kg-test", "expertise": "expert"},
+        )
+
+    events = []
+    for line in resp.text.strip().split("\n\n"):
+        if line.startswith("data: "):
+            import json as _json
+            events.append(_json.loads(line[6:]))
+    done = next(e for e in events if e["type"] == "done")
+    assert done["intent"]["intent"] == "diagnostic_cause"
+    assert done["kg_paths"][0]["path"].startswith("Misfire --CAUSED_BY")
+    assert "citations" in done
 
 
 def test_document_versioning_increments():

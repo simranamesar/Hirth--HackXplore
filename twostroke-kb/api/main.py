@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json as _json
 from pathlib import Path
-from typing import Generator
+from typing import Any, Generator
 
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
@@ -129,7 +129,7 @@ async def upload_stream(file: UploadFile = File(...)) -> StreamingResponse:
 
                 q.put({"type": "stage", "text": "Building knowledge graph…", "pct": 95})
                 try:
-                    graph_builder.extract(clean)
+                    graph_builder.extract(clean, chunks=chunks)
                 except Exception:
                     pass
 
@@ -213,6 +213,7 @@ def _stream_answer(
     from agent.reranker import rerank
     from agent.verifier import is_grounded
     from agent.recommender import related as get_related
+    from agent.kg_retrieval import retrieve_kg_context
     from ingestion.format_router import detect_language
     from llm import stream_chat
 
@@ -237,6 +238,11 @@ def _stream_answer(
     search_query = question + (" " + history_note if history_note else "")
 
     try:
+        kg_result = retrieve_kg_context(question)
+    except Exception:
+        kg_result = {"intent": {"intent": "general_question"}, "paths": [], "graph_evidence": [], "context": ""}
+
+    try:
         chunks = search(search_query, k=settings.retrieve_top_k)
     except Exception:
         chunks = []
@@ -253,6 +259,9 @@ def _stream_answer(
             "citations": [],
             "confidence": "low",
             "related_questions": [],
+            "kg_paths": kg_result.get("paths", []),
+            "graph_evidence": kg_result.get("graph_evidence", []),
+            "intent": kg_result.get("intent", {}),
         })
         return
 
@@ -284,6 +293,15 @@ def _stream_answer(
     )
     lang = detect_language(question)
     lang_note = f" Answer in {lang}." if lang not in ("en", "unknown", "") else ""
+    kg_context = kg_result.get("context", "")
+    kg_note = (
+        "\n\nUse this Knowledge Graph evidence to structure diagnostic reasoning when relevant. "
+        "Do not cite KG paths as [Source N]; cite numbered document sources for factual claims. "
+        "Mention graph-backed paths only when evidence is shown.\n\n"
+        + kg_context
+        if kg_context
+        else ""
+    )
 
     messages = [
         {
@@ -301,6 +319,7 @@ def _stream_answer(
                 + ("\n\n" + history_note.strip() if history_note else "")
                 + "\n\nSources:\n"
                 + "\n\n".join(context_lines)
+                + kg_note
             ),
         },
         {"role": "user", "content": question},
@@ -341,6 +360,9 @@ def _stream_answer(
         "citations": citations,
         "confidence": "high" if grounded else "low",
         "related_questions": related_qs,
+        "kg_paths": kg_result.get("paths", []),
+        "graph_evidence": kg_result.get("graph_evidence", []),
+        "intent": kg_result.get("intent", {}),
     })
 
 
@@ -628,27 +650,197 @@ def get_chunk(chunk_id: int) -> JSONResponse:
         return JSONResponse({"error": str(exc)}, status_code=500)
 
 
+def _json_obj(raw: Any) -> dict[str, Any]:
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str):
+        try:
+            parsed = _json.loads(raw or "{}")
+            return parsed if isinstance(parsed, dict) else {}
+        except Exception:
+            return {}
+    return {}
+
+
+def _confidence(value: Any) -> float | None:
+    if value is None or value == "":
+        return None
+    try:
+        return max(0.0, min(1.0, float(value)))
+    except (TypeError, ValueError):
+        return None
+
+
+def _listify(value: Any) -> list[Any]:
+    if value is None or value == "":
+        return []
+    if isinstance(value, list):
+        return value
+    return [value]
+
+
+def serialize_graph_node(node_id: int, ntype: str, name: str, props_raw: Any) -> dict[str, Any] | None:
+    """Serialize a graph node with backward-compatible fields plus rich metadata."""
+    from ingestion.kg_normalizer import normalize_entity
+
+    normalized = normalize_entity(name, ntype)
+    if not normalized["is_valid"]:
+        return None
+    props = _json_obj(props_raw)
+    aliases = props.get("aliases") or normalized.get("aliases") or []
+    doc_ids = _listify(props.get("doc_ids")) or _listify(props.get("doc_id"))
+    confidence = _confidence(props.get("confidence"))
+    label = props.get("display_name") or normalized["display_name"] or normalized["canonical_name"]
+    return {
+        "id": node_id,
+        "label": label,
+        "name": label,  # Backward compatibility for current frontend.
+        "type": normalized["type"],
+        "canonical_name": normalized["canonical_name"],
+        "aliases": aliases,
+        "confidence": confidence,
+        "source_count": int(props.get("source_count") or len(set(map(str, doc_ids))) or 0),
+        "doc_ids": doc_ids,
+        "props": props,
+    }
+
+
+def serialize_graph_edge(edge_id: int, src_id: int, dst_id: int, relation: str, props_raw: Any) -> dict[str, Any]:
+    """Serialize a graph edge with provenance defaults for old rows."""
+    props = _json_obj(props_raw)
+    confidence = _confidence(props.get("confidence"))
+    extraction_method = props.get("extraction_method") or "unknown"
+    evidence = str(props.get("evidence") or "")
+    chunk_id = props.get("source_chunk_id", props.get("chunk_id"))
+    return {
+        "id": edge_id,
+        "source": src_id,
+        "target": dst_id,
+        "relation": relation,  # Backward compatibility for current frontend.
+        "type": relation,
+        "confidence": confidence,
+        "evidence": evidence,
+        "extraction_method": extraction_method,
+        "doc_id": props.get("doc_id"),
+        "source_chunk_id": chunk_id,
+        "chunk_id": chunk_id,
+        "page": props.get("page"),
+        "source_title": props.get("source_title"),
+        "props": {
+            "doc_id": props.get("doc_id"),
+            "source_chunk_id": chunk_id,
+            "chunk_id": chunk_id,
+            "page": props.get("page"),
+            "evidence": evidence,
+            "confidence": confidence,
+            "extraction_method": extraction_method,
+            "source_title": props.get("source_title"),
+            **props,
+        },
+    }
+
+
 @app.get("/graph")
-def get_graph() -> JSONResponse:
+def get_graph(
+    node_type: str | None = None,
+    edge_type: str | None = None,
+    doc_id: str | None = None,
+    min_confidence: float = 0.4,
+    extraction_method: str | None = None,
+    include_seed: bool = True,
+    limit: int = 600,
+) -> JSONResponse:
     """Return graph nodes and edges for knowledge-map display."""
     from config import get_connection
 
     try:
+        limit = max(1, min(int(limit), 2000))
+        min_confidence = max(0.0, min(1.0, float(min_confidence)))
         conn = get_connection()
         try:
             cur = conn.cursor()
-            cur.execute("SELECT id, type, name FROM graph_nodes LIMIT 200")
-            nodes = [{"id": r[0], "type": r[1], "name": r[2]} for r in cur.fetchall()]
+            cur.execute("SELECT id, type, name, props FROM graph_nodes LIMIT %s", (limit,))
+            nodes = []
+            valid_ids = set()
+            all_node_ids = set()
+            for row in cur.fetchall():
+                node = serialize_graph_node(*row)
+                if not node:
+                    continue
+                all_node_ids.add(node["id"])
+                if node_type and node["type"] != node_type:
+                    continue
+                if doc_id and doc_id not in {str(d) for d in node["doc_ids"]}:
+                    continue
+                nodes.append(node)
+                valid_ids.add(node["id"])
             cur.execute(
-                "SELECT src_id, dst_id, relation FROM graph_edges LIMIT 400"
+                "SELECT id, src_id, dst_id, relation, props FROM graph_edges LIMIT %s",
+                (limit,),
             )
-            edges = [{"source": r[0], "target": r[1], "relation": r[2]} for r in cur.fetchall()]
+            edges = []
+            edge_node_ids = set()
+            for row in cur.fetchall():
+                edge = serialize_graph_edge(*row)
+                if edge["source"] not in all_node_ids or edge["target"] not in all_node_ids:
+                    continue
+                if edge_type and edge["relation"] != edge_type:
+                    continue
+                if doc_id and edge.get("doc_id") != doc_id:
+                    continue
+                if extraction_method and edge["extraction_method"] != extraction_method:
+                    continue
+                if not include_seed and edge["extraction_method"] == "manual_seed":
+                    continue
+                if (
+                    edge["confidence"] is not None
+                    and edge["confidence"] < min_confidence
+                    and edge["extraction_method"] != "manual_seed"
+                ):
+                    continue
+                edge_node_ids.update([edge["source"], edge["target"]])
+                edges.append(edge)
+            if node_type or doc_id:
+                edges = [e for e in edges if e["source"] in valid_ids and e["target"] in valid_ids]
+                edge_node_ids = {nid for e in edges for nid in (e["source"], e["target"])}
+            else:
+                valid_ids = edge_node_ids or valid_ids
+            nodes = [n for n in nodes if n["id"] in valid_ids or not edges]
         finally:
             conn.close()
 
-        return JSONResponse({"nodes": nodes, "edges": edges})
+        return JSONResponse({
+            "nodes": nodes,
+            "edges": edges,
+            "filters": {
+                "node_type": node_type,
+                "edge_type": edge_type,
+                "doc_id": doc_id,
+                "min_confidence": min_confidence,
+                "extraction_method": extraction_method,
+                "include_seed": include_seed,
+                "limit": limit,
+            },
+        })
     except Exception:
         return JSONResponse({"nodes": [], "edges": [], "error": "db unavailable"})
+
+
+@app.get("/graph/diagnostic-paths")
+def graph_diagnostic_paths(query: str, limit: int = 5) -> JSONResponse:
+    """Return KG diagnostic paths for a query; frontend wiring TODO."""
+    try:
+        from agent.kg_retrieval import retrieve_kg_context
+
+        result = retrieve_kg_context(query, limit=max(1, min(limit, 20)))
+        return JSONResponse({
+            "query": query,
+            "intent": result.get("intent", {}),
+            "paths": result.get("paths", []),
+            "context": result.get("context", ""),
+        })
+    except Exception as exc:
+        return JSONResponse({"query": query, "paths": [], "error": str(exc)}, status_code=500)
 
 
 if __name__ == "__main__":

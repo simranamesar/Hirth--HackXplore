@@ -19,3 +19,5 @@ data/
 *.swp
 Thumbs.db
 .env
+*.pid
+*.log

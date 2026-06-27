@@ -177,13 +177,45 @@
     #chunkDetail pre{background:var(--ins);border:1px solid var(--line);border-radius:8px;padding:12px;font-size:12px;white-space:pre-wrap;word-break:break-word;max-height:280px;overflow-y:auto;color:var(--tx2);font-family:var(--mono)}
 
     /* ── Knowledge graph ── */
+    .graph-tools{display:flex;flex-direction:column;gap:12px;margin-bottom:14px}
+    .graph-toolrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .graph-toolrow input[type=text]{min-width:220px;flex:1}
+    .graph-select{background:var(--panel);border:1px solid var(--line2);border-radius:8px;color:var(--tx);font-size:12px;font-family:var(--mono);padding:7px 9px;outline:none}
+    .graph-filtergroup{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+    .filter-chip{font-family:var(--mono);font-size:10.5px;color:var(--tx2);background:#ffffff08;border:1px solid var(--line);border-radius:999px;padding:5px 8px;cursor:pointer;user-select:none;transition:.1s}
+    .filter-chip:hover{border-color:var(--line2);color:var(--tx)}
+    .filter-chip.on{color:var(--grn);border-color:#3fd07a44;background:#3fd07a12}
+    .toggle-chip{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px;color:var(--tx2);background:var(--ins);border:1px solid var(--line);border-radius:7px;padding:6px 8px;cursor:pointer;user-select:none}
+    .toggle-chip input{accent-color:var(--grn)}
+    .graph-layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:12px;align-items:stretch}
     #graphCanvas{width:100%;height:460px;border:1px solid var(--line);border-radius:10px;background:var(--ins);overflow:hidden}
     #graphCanvas svg{width:100%;height:100%}
     .node circle{stroke:var(--bg);stroke-width:1.5px}
+    .node.selected circle{stroke:var(--grn);stroke-width:3px}
+    .node.match circle{stroke:var(--amb);stroke-width:3px}
     .node text{font-size:10.5px;fill:var(--tx2);pointer-events:none;font-family:var(--mono)}
-    .link{stroke:var(--line2);stroke-opacity:0.7}
-    .link-label{font-size:9px;fill:var(--tx3);font-family:var(--mono)}
+    .node-type-label{font-size:8px;fill:var(--bg);font-family:var(--mono);font-weight:700;pointer-events:none;text-transform:uppercase}
+    .link{stroke:var(--line2);stroke-opacity:0.7;cursor:pointer}
+    .link.selected{stroke:var(--grn);stroke-opacity:1}
+    .link-label{font-size:9px;fill:var(--tx3);font-family:var(--mono);cursor:pointer}
     #graphEmpty{text-align:center;padding:60px;color:var(--tx3);font-family:var(--mono);font-size:12px;letter-spacing:.07em;text-transform:uppercase}
+    .graph-inspector{min-height:460px;border:1px solid var(--line);border-radius:10px;background:var(--ins);padding:14px;overflow:auto}
+    .graph-inspector-empty{height:100%;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--tx3);font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;line-height:1.5}
+    .inspector-title{font-family:'Saira';font-weight:600;font-size:17px;line-height:1.2;margin-bottom:8px}
+    .inspector-sub{font-family:var(--mono);font-size:11px;color:var(--tx3);margin-bottom:12px}
+    .badge-row{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 12px}
+    .kg-badge{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;padding:3px 7px;border-radius:999px;border:1px solid var(--line2);background:#ffffff08;color:var(--tx2);text-transform:uppercase}
+    .kg-badge.good{color:var(--grn);border-color:#3fd07a33;background:#3fd07a10}
+    .kg-badge.warn{color:var(--amb);border-color:#f0a83033;background:#f0a83010}
+    .kg-badge.bad{color:#ff9483;border-color:#e5484d33;background:#e5484d10}
+    .kg-kv{display:grid;grid-template-columns:95px minmax(0,1fr);gap:8px;border-top:1px solid var(--line);padding-top:10px;margin-top:10px;font-size:12px}
+    .kg-kv .k{font-family:var(--mono);font-size:10px;color:var(--tx3);letter-spacing:.06em;text-transform:uppercase}
+    .kg-kv .v{color:var(--tx2);word-break:break-word}
+    .evidence-box{margin-top:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:10px;color:var(--tx2);font-size:12px;line-height:1.45;white-space:pre-wrap}
+    .connected-list{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+    .connected-item{border:1px solid var(--line);border-radius:7px;background:#ffffff05;padding:7px 8px;font-size:12px;color:var(--tx2)}
+    .connected-item b{color:var(--tx);font-weight:600}
+    @media (max-width:980px){.graph-layout{grid-template-columns:1fr}.graph-inspector{min-height:220px}}
 
     /* ── Entities ── */
     .entity-pill{display:inline-block;margin:3px;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600;font-family:var(--mono)}
@@ -411,8 +443,32 @@
               Knowledge Graph
               <button class="btn sm" style="margin-left:auto" onclick="loadGraph()">Refresh</button>
             </div>
-            <div id="graphCanvas"><svg id="graphSvg"></svg></div>
-            <div id="graphEmpty" style="display:none"></div>
+            <div class="graph-tools">
+              <div class="graph-toolrow">
+                <input type="text" id="graphSearch" placeholder="Search spark plug, misfire, overheating, carburetor" oninput="applyGraphFilters()"/>
+                <select id="graphMinConfidence" class="graph-select" onchange="loadGraph()">
+                  <option value="0.4">confidence >= 0.40</option>
+                  <option value="0">show all confidence</option>
+                  <option value="0.6">confidence >= 0.60</option>
+                  <option value="0.8">confidence >= 0.80</option>
+                </select>
+                <label class="toggle-chip"><input id="graphShowSeed" type="checkbox" checked onchange="loadGraph()"/> seed ontology</label>
+                <label class="toggle-chip"><input id="graphShowDocFacts" type="checkbox" checked onchange="applyGraphFilters()"/> document facts</label>
+                <label class="toggle-chip"><input id="graphShowWeak" type="checkbox" onchange="loadGraph()"/> weak edges</label>
+              </div>
+              <div class="graph-filtergroup" id="graphNodeFilters"></div>
+              <div class="graph-filtergroup" id="graphEdgeFilters"></div>
+              <div class="graph-filtergroup" id="graphMethodFilters"></div>
+            </div>
+            <div class="graph-layout">
+              <div>
+                <div id="graphCanvas"><svg id="graphSvg"></svg></div>
+                <div id="graphEmpty" style="display:none"></div>
+              </div>
+              <aside id="graphInspector" class="graph-inspector">
+                <div class="graph-inspector-empty">Click a node or relationship to inspect evidence</div>
+              </aside>
+            </div>
             <div style="margin-top:8px;font-size:11px;color:var(--tx3);font-family:var(--mono)">
               <span style="color:var(--grn)">●</span> engine &nbsp;
               <span style="color:var(--tx2)">●</span> part &nbsp;
@@ -853,18 +909,133 @@
   }
 
   // ── Knowledge graph ───────────────────────────────────────────────────
-  const NODE_COLOR = { engine:"#3fd07a", part:"#9aa7b5", symptom:"#f0a830", cause:"#e5484d", fix:"#56a6ff" };
+  const NODE_TYPES = ["engine","system","part","symptom","cause","fix","spec","source","procedure","warning"];
+  const EDGE_TYPES = ["HAS_SYSTEM","HAS_PART","HAS_SYMPTOM","CAUSED_BY","FIXED_BY","HAS_SPEC","MENTIONED_IN","EVIDENCED_BY","REQUIRES_PROCEDURE","TESTED_BY","RELATED_TO"];
+  const EXTRACTION_METHODS = ["manual_seed","rule","regex","table","llm","unknown"];
+  const NODE_COLOR = {
+    engine:"#3fd07a", system:"#56a6ff", part:"#9aa7b5", symptom:"#f0a830",
+    cause:"#e5484d", fix:"#7ee8a2", spec:"#c58cff", source:"#7c8794",
+    procedure:"#5dd6c8", warning:"#ff9483", unknown:"#66727e"
+  };
   let _graphData = null;
+  let _graphFiltered = { nodes: [], edges: [] };
+  let _graphSelected = null;
+  const graphState = {
+    nodeTypes: new Set(NODE_TYPES),
+    edgeTypes: new Set(EDGE_TYPES),
+    methods: new Set(EXTRACTION_METHODS)
+  };
 
-  async function loadGraph() {
-    try {
-      const r = await fetch("/graph");
-      _graphData = await r.json();
-    } catch { return; }
-    _renderGraph(_graphData);
+  function _setupGraphFilterChips() {
+    _renderFilterChips("graphNodeFilters", NODE_TYPES, graphState.nodeTypes, "node");
+    _renderFilterChips("graphEdgeFilters", EDGE_TYPES, graphState.edgeTypes, "edge");
+    _renderFilterChips("graphMethodFilters", EXTRACTION_METHODS, graphState.methods, "method");
   }
 
-  function _renderGraph(data) {
+  function _renderFilterChips(id, values, selected, kind) {
+    const el = document.getElementById(id);
+    if (!el || el.dataset.ready) return;
+    el.dataset.ready = "1";
+    const label = kind === "node" ? "Nodes" : kind === "edge" ? "Edges" : "Methods";
+    el.innerHTML = `<span class="lbl" style="margin-right:2px">${label}</span>` + values.map(v =>
+      `<span class="filter-chip on" data-kind="${kind}" data-value="${v}" onclick="toggleGraphFilter('${kind}','${v}')">${v.replaceAll("_"," ")}</span>`
+    ).join("");
+  }
+
+  function toggleGraphFilter(kind, value) {
+    const target = kind === "node" ? graphState.nodeTypes : kind === "edge" ? graphState.edgeTypes : graphState.methods;
+    if (target.has(value)) target.delete(value); else target.add(value);
+    document.querySelectorAll(`.filter-chip[data-kind="${kind}"][data-value="${value}"]`).forEach(el => el.classList.toggle("on", target.has(value)));
+    applyGraphFilters();
+  }
+
+  async function loadGraph() {
+    _setupGraphFilterChips();
+    const minEl = document.getElementById("graphMinConfidence");
+    const showWeak = document.getElementById("graphShowWeak")?.checked;
+    const showSeed = document.getElementById("graphShowSeed")?.checked !== false;
+    const minConfidence = showWeak ? "0" : (minEl?.value || "0.4");
+    try {
+      const params = new URLSearchParams({ limit: "1200", min_confidence: minConfidence, include_seed: String(showSeed) });
+      const r = await fetch(`/graph?${params.toString()}`);
+      _graphData = await r.json();
+    } catch { return; }
+    applyGraphFilters();
+  }
+
+  function applyGraphFilters() {
+    _setupGraphFilterChips();
+    const data = _graphData || { nodes: [], edges: [] };
+    const q = (document.getElementById("graphSearch")?.value || "").trim().toLowerCase();
+    const showDocFacts = document.getElementById("graphShowDocFacts")?.checked !== false;
+    const showSeed = document.getElementById("graphShowSeed")?.checked !== false;
+    const showWeak = document.getElementById("graphShowWeak")?.checked === true;
+    const minConfidence = Number(document.getElementById("graphMinConfidence")?.value || 0.4);
+    const nodeMap = new Map((data.nodes || []).map(n => [String(n.id), n]));
+    const matchesSearch = n => {
+      if (!q) return true;
+      const aliases = Array.isArray(n.aliases) ? n.aliases.join(" ") : "";
+      return `${n.label || n.name || ""} ${n.canonical_name || ""} ${aliases} ${n.type || ""}`.toLowerCase().includes(q);
+    };
+    const edgeMatchesSearch = e => {
+      if (!q) return true;
+      const s = nodeMap.get(String(e.source));
+      const t = nodeMap.get(String(e.target));
+      return matchesSearch(s || {}) || matchesSearch(t || {}) || `${e.relation || e.type || ""} ${e.evidence || ""}`.toLowerCase().includes(q);
+    };
+    const edges = (data.edges || []).filter(e => {
+      const method = e.extraction_method || (e.props || {}).extraction_method || "unknown";
+      const confidence = _edgeConfidence(e);
+      if (!graphState.edgeTypes.has(e.relation || e.type)) return false;
+      if (!graphState.methods.has(method)) return false;
+      if (!showSeed && method === "manual_seed") return false;
+      if (!showDocFacts && method !== "manual_seed") return false;
+      if (!showWeak && confidence !== null && confidence < minConfidence && method !== "manual_seed") return false;
+      return edgeMatchesSearch(e);
+    });
+    const connectedIds = new Set(edges.flatMap(e => [String(e.source), String(e.target)]));
+    const nodes = (data.nodes || []).filter(n => {
+      if (!graphState.nodeTypes.has(n.type || "unknown")) return false;
+      if (!connectedIds.has(String(n.id)) && edges.length) return false;
+      return matchesSearch(n) || connectedIds.has(String(n.id));
+    });
+    const visibleIds = new Set(nodes.map(n => String(n.id)));
+    _graphFiltered = {
+      nodes,
+      edges: edges.filter(e => visibleIds.has(String(e.source)) && visibleIds.has(String(e.target)))
+    };
+    _renderGraph(_graphFiltered, q);
+    if (_graphSelected) _refreshInspectorSelection();
+  }
+
+  function _edgeConfidence(edge) {
+    const v = edge.confidence ?? (edge.props || {}).confidence;
+    if (v === null || v === undefined || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : null;
+  }
+
+  function _confidenceBadge(conf) {
+    if (conf === null) return '<span class="kg-badge">confidence unknown</span>';
+    const cls = conf >= .8 ? "good" : conf >= .55 ? "warn" : "bad";
+    return `<span class="kg-badge ${cls}">${Math.round(conf * 100)}% confidence</span>`;
+  }
+
+  function _esc(s) {
+    return String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#039;" }[c]));
+  }
+
+  function _nodeById(id) {
+    return (_graphFiltered.nodes || []).find(n => String(n.id) === String(id)) || (_graphData?.nodes || []).find(n => String(n.id) === String(id));
+  }
+
+  function _edgeEndpoint(edge, key) {
+    const value = edge[key];
+    return typeof value === "object" && value ? value.id : value;
+  }
+
+  function _renderGraph(data, query) {
+    return _renderGraphRich(data, query);
     const svg = d3.select("#graphSvg");
     svg.selectAll("*").remove();
     const empty = document.getElementById("graphEmpty");
@@ -901,6 +1072,134 @@
   }
 
   // ── Entities ──────────────────────────────────────────────────────────
+  function _renderGraphRich(data, query) {
+    const svg = d3.select("#graphSvg");
+    svg.selectAll("*").remove();
+    const empty = document.getElementById("graphEmpty");
+    if (!data || !data.nodes || !data.nodes.length) {
+      empty.style.display = "block";
+      empty.textContent = "No matching graph nodes. Adjust filters or ingest documents.";
+      document.getElementById("graphCanvas").style.display = "none";
+      return;
+    }
+    empty.style.display = "none";
+    document.getElementById("graphCanvas").style.display = "block";
+    const W = document.getElementById("graphCanvas").clientWidth || 800, H = 460;
+    svg.attr("viewBox", `0 0 ${W} ${H}`);
+    const nodes = data.nodes.map(d => ({...d}));
+    const edges = data.edges.map(d => ({...d}));
+    const sim = d3.forceSimulation(nodes)
+      .force("link", d3.forceLink(edges).id(d => d.id).distance(d => (d.relation === "RELATED_TO" ? 115 : 92)))
+      .force("charge", d3.forceManyBody().strength(-230))
+      .force("center", d3.forceCenter(W/2, H/2))
+      .force("collision", d3.forceCollide(34));
+    const link = svg.append("g").selectAll("line").data(edges).join("line")
+      .attr("class", d => "link" + (_graphSelected?.kind === "edge" && _graphSelected.id === d.id ? " selected" : ""))
+      .attr("stroke-width", d => 1.2 + ((_edgeConfidence(d) ?? .45) * 2.2))
+      .attr("stroke-dasharray", d => (d.extraction_method || "") === "manual_seed" ? "4 4" : null)
+      .on("click", (ev,d) => { ev.stopPropagation(); showGraphEdge(d); });
+    const llab = svg.append("g").selectAll("text").data(edges).join("text")
+      .attr("class","link-label")
+      .text(d => `${d.relation || d.type || "RELATED"} ${_edgeConfidence(d) === null ? "" : Math.round(_edgeConfidence(d) * 100)}`)
+      .on("click", (ev,d) => { ev.stopPropagation(); showGraphEdge(d); });
+    const node = svg.append("g").selectAll("g").data(nodes).join("g")
+      .attr("class", d => {
+        const text = `${d.label || d.name || ""} ${d.canonical_name || ""} ${(d.aliases || []).join(" ")}`.toLowerCase();
+        const selected = _graphSelected?.kind === "node" && String(_graphSelected.id) === String(d.id);
+        return "node" + (query && text.includes(query) ? " match" : "") + (selected ? " selected" : "");
+      })
+      .on("click", (ev,d) => { ev.stopPropagation(); showGraphNode(d); })
+      .call(d3.drag()
+        .on("start",(ev,d)=>{ if(!ev.active) sim.alphaTarget(.3).restart(); d.fx=d.x; d.fy=d.y; })
+        .on("drag", (ev,d)=>{ d.fx=ev.x; d.fy=ev.y; })
+        .on("end",  (ev,d)=>{ if(!ev.active) sim.alphaTarget(0); d.fx=null; d.fy=null; }));
+    node.append("circle").attr("r",15).attr("fill",d=>NODE_COLOR[d.type]||NODE_COLOR.unknown);
+    node.append("text").attr("class","node-type-label").attr("dy",3).attr("text-anchor","middle").text(d=>(d.type||"?").slice(0,3));
+    node.append("text").attr("dy",26).attr("text-anchor","middle").text(d=>{
+      const label = d.label || d.name || "unknown";
+      return label.length>17 ? label.slice(0,15)+"..." : label;
+    });
+    node.append("title").text(d=>`[${d.type || "unknown"}] ${d.label || d.name || "unknown"}`);
+    svg.on("click", () => { _graphSelected = null; _renderInspectorEmpty(); _renderGraph(_graphFiltered, query); });
+    sim.on("tick",()=>{
+      link.attr("x1",d=>d.source.x).attr("y1",d=>d.source.y).attr("x2",d=>d.target.x).attr("y2",d=>d.target.y);
+      llab.attr("x",d=>(d.source.x+d.target.x)/2).attr("y",d=>(d.source.y+d.target.y)/2);
+      node.attr("transform",d=>`translate(${d.x},${d.y})`);
+    });
+  }
+
+  function _renderInspectorEmpty() {
+    const el = document.getElementById("graphInspector");
+    if (el) el.innerHTML = '<div class="graph-inspector-empty">Click a node or relationship to inspect evidence</div>';
+  }
+
+  function _refreshInspectorSelection() {
+    if (!_graphSelected) return;
+    if (_graphSelected.kind === "node") {
+      const node = _nodeById(_graphSelected.id);
+      if (node) showGraphNode(node, true);
+    } else {
+      const edge = (_graphFiltered.edges || []).find(e => String(e.id) === String(_graphSelected.id));
+      if (edge) showGraphEdge(edge, true);
+    }
+  }
+
+  function showGraphNode(node, skipRender) {
+    _graphSelected = { kind: "node", id: node.id };
+    const edges = (_graphFiltered.edges || []).filter(e => String(_edgeEndpoint(e,"source")) === String(node.id) || String(_edgeEndpoint(e,"target")) === String(node.id));
+    const connected = edges.slice(0, 14).map(e => {
+      const otherId = String(_edgeEndpoint(e,"source")) === String(node.id) ? _edgeEndpoint(e,"target") : _edgeEndpoint(e,"source");
+      const other = _nodeById(otherId) || {};
+      return `<div class="connected-item"><b>${_esc(e.relation || e.type || "RELATED")}</b><br>${_esc(other.label || other.name || otherId)} <span class="muted">(${_esc(other.type || "unknown")})</span></div>`;
+    }).join("") || '<div class="connected-item">No visible connections under current filters.</div>';
+    const aliases = Array.isArray(node.aliases) && node.aliases.length ? node.aliases.join(", ") : "none";
+    document.getElementById("graphInspector").innerHTML = `
+      <div class="inspector-title">${_esc(node.label || node.name || "Unknown node")}</div>
+      <div class="inspector-sub">Node ${_esc(node.id)}</div>
+      <div class="badge-row">
+        <span class="kg-badge good">${_esc(node.type || "unknown")}</span>
+        ${_confidenceBadge(_edgeConfidence(node))}
+        <span class="kg-badge">${_esc(node.source_count ?? 0)} sources</span>
+      </div>
+      <div class="kg-kv">
+        <div class="k">Canonical</div><div class="v">${_esc(node.canonical_name || node.label || node.name || "unknown")}</div>
+        <div class="k">Aliases</div><div class="v">${_esc(aliases)}</div>
+        <div class="k">Doc IDs</div><div class="v">${_esc((node.doc_ids || []).join(", ") || "none stored")}</div>
+      </div>
+      <div class="inspector-sub" style="margin-top:14px">Visible connections</div>
+      <div class="connected-list">${connected}</div>
+    `;
+    if (!skipRender) _renderGraph(_graphFiltered, (document.getElementById("graphSearch")?.value || "").trim().toLowerCase());
+  }
+
+  function showGraphEdge(edge, skipRender) {
+    _graphSelected = { kind: "edge", id: edge.id };
+    const src = _nodeById(_edgeEndpoint(edge,"source")) || {};
+    const dst = _nodeById(_edgeEndpoint(edge,"target")) || {};
+    const conf = _edgeConfidence(edge);
+    const evidence = edge.evidence || (edge.props || {}).evidence || "No evidence stored";
+    const method = edge.extraction_method || (edge.props || {}).extraction_method || "unknown";
+    document.getElementById("graphInspector").innerHTML = `
+      <div class="inspector-title">${_esc(edge.relation || edge.type || "Relationship")}</div>
+      <div class="inspector-sub">${_esc(src.label || src.name || edge.source)} to ${_esc(dst.label || dst.name || edge.target)}</div>
+      <div class="badge-row">
+        ${_confidenceBadge(conf)}
+        <span class="kg-badge">${_esc(method)}</span>
+        <span class="kg-badge">${_esc(edge.relation || edge.type || "unknown")}</span>
+      </div>
+      <div class="kg-kv">
+        <div class="k">Source</div><div class="v">${_esc(src.label || src.name || edge.source)} (${_esc(src.type || "unknown")})</div>
+        <div class="k">Target</div><div class="v">${_esc(dst.label || dst.name || edge.target)} (${_esc(dst.type || "unknown")})</div>
+        <div class="k">Document</div><div class="v">${_esc(edge.source_title || edge.doc_id || "not stored")}</div>
+        <div class="k">Page</div><div class="v">${_esc(edge.page ?? "not stored")}</div>
+        <div class="k">Chunk</div><div class="v">${_esc(edge.source_chunk_id || edge.chunk_id || "not stored")}</div>
+      </div>
+      <div class="inspector-sub" style="margin-top:14px">Evidence</div>
+      <div class="evidence-box">${_esc(evidence)}</div>
+    `;
+    if (!skipRender) _renderGraph(_graphFiltered, (document.getElementById("graphSearch")?.value || "").trim().toLowerCase());
+  }
+
   const ENTITY_CLS = { engine:"entity-engine",part:"entity-part",symptom:"entity-symptom",cause:"entity-cause",fix:"entity-fix",spec:"entity-spec",unit:"entity-unit" };
 
   async function loadEntities() {
