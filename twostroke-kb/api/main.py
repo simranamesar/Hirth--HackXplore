@@ -166,17 +166,15 @@ async def upload_stream(file: UploadFile = File(...)) -> StreamingResponse:
 async def ask(
     question: str = Form(...),
     session_id: str = Form("anon"),
-    expertise: str = Form("expert"),
 ) -> JSONResponse:
     """ReAct agent answer with citations, grounding check, and related questions.
 
-    expertise: "beginner" (plain language) | "expert" (concise technical).
     Falls back to plain retrieve->answer automatically if the agent graph fails.
     """
     from agent.graph import answer
     from memory.store import append_turn
 
-    result = answer(question, session_id=session_id, expertise=expertise)
+    result = answer(question, session_id=session_id)
 
     try:
         append_turn(session_id, "user", question)
@@ -198,7 +196,6 @@ def _sse(data: dict) -> str:
 def _stream_answer(
     question: str,
     session_id: str,
-    expertise: str,
 ) -> Generator[str, None, None]:
     """Sync generator yielding SSE events for /ask/stream.
 
@@ -254,6 +251,7 @@ def _stream_answer(
             pass
 
     if not chunks:
+        yield _sse({"type": "delta", "text": "I cannot find information about this in the uploaded documents. Please upload relevant documents first, or rephrase your question."})
         yield _sse({
             "type": "done",
             "citations": [],
@@ -286,11 +284,7 @@ def _stream_answer(
             "snippet": c["content"][:200],
         })
 
-    expertise_note = (
-        " Use plain, jargon-free language. Define technical terms when you use them."
-        if expertise == "beginner"
-        else " Be concise and technical."
-    )
+    expertise_note = " Be concise and technical."
     lang = detect_language(question)
     lang_note = f" Answer in {lang}." if lang not in ("en", "unknown", "") else ""
     kg_context = kg_result.get("context", "")
@@ -307,17 +301,22 @@ def _stream_answer(
         {
             "role": "system",
             "content": (
-                "You are TwoStrokeGPT, an expert on two-stroke engines. "
-                "Answer ONLY using the numbered sources below. "
-                "Cite each fact as [Source N] immediately after the claim. "
-                "Never invent or estimate numeric values. "
-                "Write a COMPLETE answer. If you cannot fit everything, "
-                "summarise remaining points in a short final paragraph — "
-                "never end mid-sentence."
+                "You are TwoStrokeGPT, a document-grounded assistant for two-stroke engine manuals.\n\n"
+                "STRICT RULES — follow them exactly:\n"
+                "1. Answer ONLY using the numbered [Source N] documents provided below. "
+                "DO NOT use your training knowledge under any circumstances.\n"
+                "2. Every factual claim MUST be followed by its [Source N] citation immediately.\n"
+                "3. If the answer to the question is not explicitly stated in any source, "
+                "respond with: 'I cannot find information about this in the uploaded documents.' "
+                "Do NOT guess, infer, or fill in from memory.\n"
+                "4. NEVER invent, estimate, or approximate any numeric value "
+                "(RPM, temperature, torque, timing, pressure, gap, ratio, etc.). "
+                "Only state numbers that appear word-for-word in a source.\n"
+                "5. Write a complete, well-structured answer. Never end mid-sentence."
                 + expertise_note
                 + lang_note
                 + ("\n\n" + history_note.strip() if history_note else "")
-                + "\n\nSources:\n"
+                + "\n\nSOURCES:\n"
                 + "\n\n".join(context_lines)
                 + kg_note
             ),
@@ -370,7 +369,6 @@ def _stream_answer(
 def ask_stream(
     question: str = Form(...),
     session_id: str = Form("anon"),
-    expertise: str = Form("expert"),
 ) -> StreamingResponse:
     """Streaming version of /ask using Server-Sent Events.
 
@@ -378,7 +376,7 @@ def ask_stream(
     Falls back gracefully to an empty done event when retrieval returns nothing.
     """
     return StreamingResponse(
-        _stream_answer(question, session_id=session_id, expertise=expertise),
+        _stream_answer(question, session_id=session_id),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
@@ -411,63 +409,6 @@ async def feedback(
         pass
 
     return JSONResponse({"status": "recorded"})
-
-
-@app.get("/gaps")
-def get_gaps() -> JSONResponse:
-    """Return unresolved knowledge gaps logged by the verifier."""
-    from config import get_connection
-
-    try:
-        conn = get_connection()
-        try:
-            cur = conn.cursor()
-            cur.execute(
-                """
-                SELECT id, question, reason, created_at
-                FROM gaps
-                WHERE resolved = false
-                ORDER BY created_at DESC
-                LIMIT 20
-                """,
-            )
-            rows = cur.fetchall()
-        finally:
-            conn.close()
-
-        return JSONResponse({
-            "gaps": [
-                {"id": r[0], "question": r[1], "reason": r[2], "created_at": str(r[3])}
-                for r in rows
-            ]
-        })
-    except Exception:
-        return JSONResponse({"gaps": [], "error": "db unavailable"})
-
-
-@app.post("/gaps/{gap_id}/resolve")
-async def resolve_gap(gap_id: int) -> JSONResponse:
-    """Mark a knowledge gap as resolved."""
-    from config import get_connection
-
-    try:
-        conn = get_connection()
-        try:
-            with conn.transaction():
-                cur = conn.cursor()
-                cur.execute(
-                    "UPDATE gaps SET resolved = true WHERE id = %s",
-                    (gap_id,),
-                )
-                updated = cur.rowcount
-        finally:
-            conn.close()
-
-        if updated == 0:
-            return JSONResponse({"error": "gap not found"}, status_code=404)
-        return JSONResponse({"status": "resolved", "id": gap_id})
-    except Exception as exc:
-        return JSONResponse({"error": str(exc)}, status_code=500)
 
 
 @app.get("/entities")
@@ -828,7 +769,7 @@ def get_graph(
 
 @app.get("/graph/diagnostic-paths")
 def graph_diagnostic_paths(query: str, limit: int = 5) -> JSONResponse:
-    """Return KG diagnostic paths for a query; frontend wiring TODO."""
+    """Return KG diagnostic paths for a query."""
     try:
         from agent.kg_retrieval import retrieve_kg_context
 
@@ -937,6 +878,68 @@ def graph_quality() -> JSONResponse:
             "chunk_id_coverage_pct": 0, "top_connected_nodes": [],
             "noisy_unknown_nodes": [], "error": str(exc),
         })
+
+
+@app.get("/search")
+def semantic_search(q: str, limit: int = 10) -> JSONResponse:
+    """Hybrid BM25 + dense semantic search over indexed chunks."""
+    import json as _j
+    from config import get_connection
+
+    if not q or not q.strip():
+        return JSONResponse({"results": [], "error": "empty query"})
+
+    try:
+        from agent.retriever_hybrid import HybridRetriever
+        retriever = HybridRetriever()
+        hits = retriever.search(q.strip(), top_k=limit)
+        results = []
+        for h in hits:
+            results.append({
+                "id":       h.get("id"),
+                "doc_id":   h.get("doc_id", ""),
+                "score":    round(float(h.get("score", 0)), 4),
+                "snippet":  (h.get("content") or h.get("snippet") or "")[:300],
+                "metadata": h.get("metadata", {}),
+                "filename": h.get("filename") or (h.get("source_refs") or [{}])[0].get("filename", ""),
+            })
+        return JSONResponse({"results": results})
+    except Exception as exc:
+        # Fallback: plain SQL full-text search
+        try:
+            conn = get_connection()
+            try:
+                cur = conn.cursor()
+                cur.execute(
+                    """
+                    SELECT id, doc_id, content, metadata, source_refs,
+                           ts_rank_cd(to_tsvector('simple', content),
+                                      plainto_tsquery('simple', %s)) AS rank
+                    FROM chunks
+                    WHERE to_tsvector('simple', content) @@ plainto_tsquery('simple', %s)
+                    ORDER BY rank DESC LIMIT %s
+                    """,
+                    (q, q, limit),
+                )
+                rows = cur.fetchall()
+            finally:
+                conn.close()
+            results = []
+            for r in rows:
+                meta = r[3] if isinstance(r[3], dict) else _j.loads(r[3] or "{}")
+                refs = r[4] if isinstance(r[4], list) else _j.loads(r[4] or "[]")
+                filename = (refs[0].get("filename") or refs[0].get("source") or "") if refs else ""
+                results.append({
+                    "id":       r[0],
+                    "doc_id":   r[1],
+                    "score":    round(float(r[5]), 4),
+                    "snippet":  r[2][:300],
+                    "metadata": meta,
+                    "filename": filename,
+                })
+            return JSONResponse({"results": results, "mode": "fulltext_fallback"})
+        except Exception as exc2:
+            return JSONResponse({"results": [], "error": str(exc2)})
 
 
 if __name__ == "__main__":

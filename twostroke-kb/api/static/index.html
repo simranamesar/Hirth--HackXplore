@@ -14,7 +14,7 @@
       --bg:#0b0f13;--bg2:#0e141a;--panel:#141b22;--panel2:#1a232c;--ins:#090d11;
       --line:#222c36;--line2:#30404e;
       --tx:#e8edf3;--tx2:#9aa7b5;--tx3:#66727e;
-      --grn:#3fd07a;--grn-glow:#3fd07a26;--amb:#f0a830;--red:#e5484d;--blu:#56a6ff;
+      --grn:#56a6ff;--grn-glow:#56a6ff26;--amb:#f0a830;--red:#e5484d;--blu:#56a6ff;
       --mono:'IBM Plex Mono',monospace;
     }
     html,body{height:100%;margin:0;background:var(--bg);color:var(--tx);font-family:'IBM Plex Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
@@ -32,19 +32,19 @@
     .rail{width:236px;flex:none;background:var(--bg2);border-right:1px solid var(--line);display:flex;flex-direction:column}
     .brandbox{padding:18px 18px 16px;border-bottom:1px solid var(--line)}
     .brand{display:flex;align-items:center;gap:11px}
-    .bmark{width:34px;height:34px;border-radius:8px;background:var(--grn);display:flex;align-items:center;justify-content:center;color:#06210f;font-family:var(--mono);font-weight:600;font-size:14px;box-shadow:0 0 0 1px #ffffff14,0 6px 16px var(--grn-glow)}
+    .bmark{width:34px;height:34px;border-radius:8px;background:var(--grn);display:flex;align-items:center;justify-content:center;color:#06172e;font-family:var(--mono);font-weight:600;font-size:14px;box-shadow:0 0 0 1px #ffffff14,0 6px 16px var(--grn-glow)}
     .bname{font-family:'Saira';font-weight:700;font-size:16px;letter-spacing:.01em;line-height:1.05}
     .bsub{font-family:var(--mono);font-size:9.5px;color:var(--tx3);letter-spacing:.12em;text-transform:uppercase;margin-top:3px}
     .navsec{padding:16px 18px 7px;font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--tx3)}
     .nav{padding:0 10px 10px;display:flex;flex-direction:column;gap:3px;flex:1;overflow:auto}
     .navi{display:flex;align-items:center;gap:12px;padding:9px 11px;border-radius:8px;color:var(--tx2);cursor:pointer;border:1px solid transparent;transition:.12s;user-select:none}
     .navi:hover{background:var(--panel);color:var(--tx)}
-    .navi.on{background:var(--grn-glow);color:var(--tx);border-color:#3fd07a40}
+    .navi.on{background:var(--grn-glow);color:var(--tx);border-color:#56a6ff40}
     .nidx{font-family:var(--mono);font-size:11px;color:var(--tx3);width:16px}
     .navi.on .nidx{color:var(--grn)}
     .nlbl{font-size:14px;font-weight:500;flex:1}
     .nbadge{font-family:var(--mono);font-size:10px;color:var(--tx3);background:#ffffff0a;padding:2px 6px;border-radius:5px}
-    .navi.on .nbadge{color:var(--grn);background:#3fd07a1f}
+    .navi.on .nbadge{color:var(--grn);background:#56a6ff1f}
     .railftr{border-top:1px solid var(--line);padding:14px 16px;display:flex;flex-direction:column;gap:4px}
     .kbstat{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--tx2)}
     .kbstat b{color:var(--tx);font-weight:600}
@@ -79,7 +79,7 @@
     .who{display:flex;align-items:center;gap:8px;margin-bottom:7px}
     .ava{width:22px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:9px;font-weight:600;flex:none}
     .ava.u{background:var(--panel2);color:var(--tx2);border:1px solid var(--line2)}
-    .ava.a{background:var(--grn);color:#06210f}
+    .ava.a{background:var(--grn);color:#06172e}
     .whoname{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--tx3)}
     .ubub{align-self:flex-end;max-width:76%;background:var(--panel2);border:1px solid var(--line2);border-radius:13px 13px 4px 13px;padding:13px 16px;font-size:14.5px;line-height:1.5;white-space:pre-wrap}
     .arow{align-self:stretch}
@@ -92,22 +92,32 @@
     .fbrow{display:flex;gap:7px;align-items:center}
     .vbtn{height:30px;min-width:34px;padding:0 9px;border-radius:7px;border:1px solid var(--line2);background:var(--panel2);color:var(--tx2);cursor:pointer;font-size:12px;font-family:var(--mono);transition:.1s}
     .vbtn:hover{color:var(--tx)}
-    .vbtn.up.on{color:var(--grn);border-color:#3fd07a55;background:#3fd07a14}
+    .vbtn.up.on{color:var(--grn);border-color:#56a6ff55;background:#56a6ff14}
     .vbtn.dn.on{color:var(--red);border-color:#e5484d55;background:#e5484d14}
     .related-wrap{margin-top:12px;display:flex;flex-wrap:wrap;gap:6px}
     .rel-chip{font-family:var(--mono);font-size:11px;color:var(--tx2);background:#ffffff08;border:1px solid var(--line);padding:5px 9px;border-radius:6px;cursor:pointer;white-space:nowrap}
     .rel-chip:hover{border-color:var(--grn);color:var(--grn)}
+    .inline-evidence{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+    .inline-evidence-hdr{font-family:var(--mono);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--tx3);margin-bottom:8px}
+    .ev-card{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;background:var(--ins);cursor:pointer;transition:.1s}
+    .ev-card:hover{border-color:var(--line2)}
+    .ev-n{font-family:var(--mono);font-size:10px;color:var(--grn);min-width:24px;font-weight:700;padding-top:1px}
+    .ev-body{flex:1;min-width:0}
+    .ev-filename{font-family:var(--mono);font-size:10.5px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .ev-snippet{font-size:11.5px;color:var(--tx3);line-height:1.45;margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    cite-ref{font-family:var(--mono);font-size:10px;color:var(--grn);cursor:pointer;vertical-align:super;font-weight:700;margin-left:1px}
+    cite-ref:hover{text-decoration:underline}
 
     /* ── Composer ── */
     .composer{flex:none;border-top:1px solid var(--line);padding:16px 20px;background:var(--bg2)}
     .composer-inner{display:flex;gap:10px;align-items:flex-end;background:var(--panel);border:1px solid var(--line2);border-radius:12px;padding:10px 14px;transition:.15s}
-    .composer-inner:focus-within{border-color:#3fd07a55}
+    .composer-inner:focus-within{border-color:#56a6ff55}
     .composer-ta{flex:1;background:transparent;border:none;outline:none;color:var(--tx);font-family:'IBM Plex Sans';font-size:14px;line-height:1.5;resize:none;max-height:140px;min-height:22px}
     .composer-ta::placeholder{color:var(--tx3)}
-    .send-btn{flex:none;width:36px;height:36px;border-radius:9px;background:var(--grn);border:none;cursor:pointer;color:#06210f;display:flex;align-items:center;justify-content:center;font-size:16px;transition:.15s}
+    .send-btn{flex:none;width:36px;height:36px;border-radius:9px;background:var(--grn);border:none;cursor:pointer;color:#06172e;display:flex;align-items:center;justify-content:center;font-size:16px;transition:.15s}
     .send-btn:hover{filter:brightness(1.1)}
     .send-btn:disabled{opacity:.4;cursor:not-allowed}
-    .spinner{display:inline-block;width:13px;height:13px;border:2px solid #3fd07a55;border-top-color:var(--grn);border-radius:50%;animation:spin .6s linear infinite}
+    .spinner{display:inline-block;width:13px;height:13px;border:2px solid #56a6ff55;border-top-color:var(--grn);border-radius:50%;animation:spin .6s linear infinite}
     @keyframes spin{to{transform:rotate(360deg)}}
     .streaming-cursor::after{content:"▍";animation:blink 1s step-end infinite;color:var(--grn)}
     @keyframes blink{50%{opacity:0}}
@@ -124,21 +134,21 @@
     .srccard-top{display:flex;align-items:center;gap:8px;margin-bottom:5px}
     .tag{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.03em;padding:3px 6px;border-radius:5px;text-transform:uppercase}
     .fmt-pdf{color:#ff9483;background:#e5484d1c;border:1px solid #e5484d33}
-    .fmt-xlsx,.fmt-csv{color:var(--grn);background:#3fd07a16;border:1px solid #3fd07a33}
+    .fmt-xlsx,.fmt-csv{color:var(--grn);background:#56a6ff16;border:1px solid #56a6ff33}
     .fmt-docx,.fmt-doc{color:var(--amb);background:#f0a83016;border:1px solid #f0a83033}
     .fmt-default{color:var(--tx2);background:#ffffff0a;border:1px solid var(--line2)}
     .srccard-name{font-family:var(--mono);font-size:11px;color:var(--tx2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .srccard-page{font-family:var(--mono);font-size:10px;color:var(--tx3)}
     .srccard-snippet{font-size:11.5px;color:var(--tx3);line-height:1.45;margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-    .cite-ref{font-family:var(--mono);font-size:9.5px;color:var(--grn);background:#3fd07a18;border:1px solid #3fd07a33;border-radius:4px;padding:1px 4px;margin:0 1px;vertical-align:super;cursor:pointer;text-decoration:none}
-    .cite-ref:hover{background:#3fd07a30}
+    .cite-ref{font-family:var(--mono);font-size:9.5px;color:var(--grn);background:#56a6ff18;border:1px solid #56a6ff33;border-radius:4px;padding:1px 4px;margin:0 1px;vertical-align:super;cursor:pointer;text-decoration:none}
+    .cite-ref:hover{background:#56a6ff30}
 
     /* ── Shared card ── */
     .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}
     .sect{font-family:'Saira';font-weight:600;font-size:15px;margin-bottom:12px;display:flex;align-items:center;gap:10px;color:var(--tx)}
     .btn{font-family:'IBM Plex Sans';font-size:13px;font-weight:600;padding:8px 14px;border-radius:8px;border:1px solid var(--line2);background:var(--panel2);color:var(--tx);cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:.1s}
-    .btn:hover{border-color:#3fd07a55;color:var(--grn)}
-    .btn.pri{background:var(--grn);color:#06210f;border-color:var(--grn)}
+    .btn:hover{border-color:#56a6ff55;color:var(--grn)}
+    .btn.pri{background:var(--grn);color:#06172e;border-color:var(--grn)}
     .btn.pri:hover{filter:brightness(1.07)}
     .btn.sm{padding:5px 10px;font-size:12px}
     .muted{color:var(--tx3);font-size:13px}
@@ -150,7 +160,7 @@
     .statn.gr{color:var(--grn)}.statn.am{color:var(--amb)}
     .statl{font-family:var(--mono);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--tx3);margin-top:3px}
     .drop{border:1.5px dashed var(--line2);border-radius:14px;padding:36px;text-align:center;cursor:pointer;background:#ffffff04;transition:.15s}
-    .drop:hover,.drop.drag-over{border-color:#3fd07a66;background:#3fd07a08}
+    .drop:hover,.drop.drag-over{border-color:#56a6ff66;background:#56a6ff08}
     .dicon{width:46px;height:46px;border-radius:11px;background:var(--panel2);border:1px solid var(--line2);display:inline-flex;align-items:center;justify-content:center;font-family:var(--mono);color:var(--grn);font-size:20px;margin-bottom:12px}
     .drop-big{font-family:'Saira';font-weight:600;font-size:18px;color:var(--tx);margin-bottom:6px}
     .drop-sm{font-size:12.5px;color:var(--tx3)}
@@ -175,7 +185,7 @@
     .diag-node{padding:4px 9px;border-radius:7px;font-size:12px;font-weight:600;font-family:var(--mono)}
     .diag-node.symptom{background:#f0a83014;color:var(--amb);border:1px solid #f0a83033}
     .diag-node.cause{background:#e5484d14;color:#ff9483;border:1px solid #e5484d33}
-    .diag-node.fix{background:#3fd07a14;color:var(--grn);border:1px solid #3fd07a33}
+    .diag-node.fix{background:#56a6ff14;color:var(--grn);border:1px solid #56a6ff33}
     .diag-node.part{background:#ffffff08;color:var(--tx2);border:1px solid var(--line2)}
     .diag-meta{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-family:var(--mono);font-size:10.5px;color:var(--tx3)}
     .diag-conf{display:flex;align-items:center;gap:6px}
@@ -201,6 +211,15 @@
     .chunk-meta{font-size:11px;color:var(--tx3);margin-top:3px;font-family:var(--mono)}
     #chunkDetail{margin-top:12px;display:none}
     #chunkDetail pre{background:var(--ins);border:1px solid var(--line);border-radius:8px;padding:12px;font-size:12px;white-space:pre-wrap;word-break:break-word;max-height:280px;overflow-y:auto;color:var(--tx2);font-family:var(--mono)}
+    .chunk-table-wrap{overflow-x:auto;max-height:360px;border:1px solid var(--line);border-radius:10px;background:var(--ins)}
+    .chunk-table{width:100%;border-collapse:collapse;font-size:12.5px;font-family:var(--mono)}
+    .chunk-table th{background:var(--panel2);color:var(--tx);font-weight:600;padding:9px 12px;text-align:left;border-bottom:2px solid var(--line2);white-space:nowrap;position:sticky;top:0}
+    .chunk-table td{padding:7px 12px;border-bottom:1px solid var(--line);color:var(--tx2);vertical-align:top}
+    .chunk-table tr:last-child td{border-bottom:none}
+    .chunk-table tr:hover td{background:#ffffff05}
+    .chunk-table td:first-child{color:var(--tx);font-weight:500}
+    .chunk-table-title{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--grn);margin-bottom:8px}
+    .chunk-table-units{font-family:var(--mono);font-size:11px;color:var(--tx3);margin-top:8px;padding:6px 10px;background:var(--ins);border-radius:6px;border:1px solid var(--line)}
 
     /* ── Knowledge graph ── */
     .graph-tools{display:flex;flex-direction:column;gap:12px;margin-bottom:14px}
@@ -210,7 +229,7 @@
     .graph-filtergroup{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
     .filter-chip{font-family:var(--mono);font-size:10.5px;color:var(--tx2);background:#ffffff08;border:1px solid var(--line);border-radius:999px;padding:5px 8px;cursor:pointer;user-select:none;transition:.1s}
     .filter-chip:hover{border-color:var(--line2);color:var(--tx)}
-    .filter-chip.on{color:var(--grn);border-color:#3fd07a44;background:#3fd07a12}
+    .filter-chip.on{color:var(--grn);border-color:#56a6ff44;background:#56a6ff12}
     .toggle-chip{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px;color:var(--tx2);background:var(--ins);border:1px solid var(--line);border-radius:7px;padding:6px 8px;cursor:pointer;user-select:none}
     .toggle-chip input{accent-color:var(--grn)}
     .graph-layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:12px;align-items:stretch}
@@ -231,7 +250,7 @@
     .inspector-sub{font-family:var(--mono);font-size:11px;color:var(--tx3);margin-bottom:12px}
     .badge-row{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 12px}
     .kg-badge{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;padding:3px 7px;border-radius:999px;border:1px solid var(--line2);background:#ffffff08;color:var(--tx2);text-transform:uppercase}
-    .kg-badge.good{color:var(--grn);border-color:#3fd07a33;background:#3fd07a10}
+    .kg-badge.good{color:var(--grn);border-color:#56a6ff33;background:#56a6ff10}
     .kg-badge.warn{color:var(--amb);border-color:#f0a83033;background:#f0a83010}
     .kg-badge.bad{color:#ff9483;border-color:#e5484d33;background:#e5484d10}
     .kg-kv{display:grid;grid-template-columns:95px minmax(0,1fr);gap:8px;border-top:1px solid var(--line);padding-top:10px;margin-top:10px;font-size:12px}
@@ -245,11 +264,11 @@
 
     /* ── Entities ── */
     .entity-pill{display:inline-block;margin:3px;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600;font-family:var(--mono)}
-    .entity-engine{background:#3fd07a14;color:var(--grn);border:1px solid #3fd07a33}
+    .entity-engine{background:#56a6ff14;color:var(--grn);border:1px solid #56a6ff33}
     .entity-part{background:#ffffff08;color:var(--tx2);border:1px solid var(--line2)}
     .entity-symptom{background:#56a6ff14;color:var(--blu);border:1px solid #56a6ff33}
     .entity-cause{background:#f0a83014;color:var(--amb);border:1px solid #f0a83033}
-    .entity-fix{background:#3fd07a0a;color:#7ee8a2;border:1px solid #3fd07a22}
+    .entity-fix{background:#56a6ff0a;color:#7ee8a2;border:1px solid #56a6ff22}
     .entity-spec{background:#e5484d14;color:#ff9483;border:1px solid #e5484d33}
     .entity-unit{background:#ffffff08;color:var(--tx3);border:1px solid var(--line)}
     .entity-default{background:#ffffff08;color:var(--tx2);border:1px solid var(--line)}
@@ -266,7 +285,7 @@
     /* ── Input ── */
     input[type=text]{background:var(--panel);border:1px solid var(--line2);border-radius:8px;padding:8px 12px;color:var(--tx);font-size:13px;outline:none;font-family:'IBM Plex Sans'}
     input[type=text]::placeholder{color:var(--tx3)}
-    input[type=text]:focus{border-color:#3fd07a55}
+    input[type=text]:focus{border-color:#56a6ff55}
   </style>
 </head>
 <body>
@@ -303,14 +322,15 @@
         <span class="nidx">04</span>
         <span class="nlbl">Knowledge Graph</span>
       </div>
+      <!-- entities nav hidden; tab + JS kept for future use
       <div class="navi" onclick="switchTab('entities')" id="nav-entities">
         <span class="nidx">05</span>
         <span class="nlbl">Entities</span>
       </div>
-      <div class="navi" onclick="switchTab('gaps')" id="nav-gaps">
+      -->
+      <div class="navi" onclick="switchTab('search')" id="nav-search">
         <span class="nidx">06</span>
-        <span class="nlbl">Gaps</span>
-        <span class="nbadge" id="gapBadge">—</span>
+        <span class="nlbl">Semantic Search</span>
       </div>
     </nav>
     <div class="railftr">
@@ -330,13 +350,7 @@
         <span class="page-t" id="pageTitle">Ask</span>
         <div id="uploadStatus"></div>
       </div>
-      <div class="tb-r">
-        <!-- Beginner / Expert toggle -->
-        <div class="seg">
-          <button class="segb" id="btnBeginner" onclick="setMode('beginner')">Beginner</button>
-          <button class="segb on acc" id="btnExpert" onclick="setMode('expert')">Expert</button>
-        </div>
-      </div>
+      <div class="tb-r"></div>
     </div>
 
     <!-- Content -->
@@ -500,28 +514,8 @@
               <span style="color:var(--tx2)">●</span> part &nbsp;
               <span style="color:var(--amb)">●</span> symptom &nbsp;
               <span style="color:#f0a830)">●</span> cause &nbsp;
-              <span style="color:#3fd07a99">●</span> fix
+              <span style="color:#56a6ff99">●</span> fix
             </div>
-          </div>
-
-          <!-- ── Diagnostic Path Search ── -->
-          <div class="card" style="margin-top:14px">
-            <div class="sect">Diagnostic Path Search
-              <span class="lbl" style="margin-left:auto">Symptom → Cause → Fix</span>
-            </div>
-            <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
-              <input type="text" id="diagQuery" placeholder="e.g. misfire, overheating, won't start…" style="flex:1;min-width:200px" onkeydown="if(event.key==='Enter') searchDiagnostic()"/>
-              <button class="btn sm pri" onclick="searchDiagnostic()">Search →</button>
-            </div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
-              <span class="rel-chip" onclick="searchDiagnosticQuery('Misfire')">Misfire</span>
-              <span class="rel-chip" onclick="searchDiagnosticQuery('Overheating')">Overheating</span>
-              <span class="rel-chip" onclick="searchDiagnosticQuery('Won\'t Start')">Won't Start</span>
-              <span class="rel-chip" onclick="searchDiagnosticQuery('Rough Idle')">Rough Idle</span>
-              <span class="rel-chip" onclick="searchDiagnosticQuery('Loss of Power')">Loss of Power</span>
-              <span class="rel-chip" onclick="searchDiagnosticQuery('Hard Starting')">Hard Starting</span>
-            </div>
-            <div id="diagResults"><span class="muted">Enter a symptom to see diagnostic paths from the knowledge graph.</span></div>
           </div>
 
           <!-- ── KG Quality Stats ── -->
@@ -535,8 +529,8 @@
         </div>
       </div>
 
-      <!-- ── Entities tab ── -->
-      <div class="tab-panel" id="tab-entities">
+      <!-- ── Entities tab (hidden; restore nav item to re-enable) ── -->
+      <div class="tab-panel" id="tab-entities" style="display:none!important">
         <div class="pad">
           <div class="card">
             <div class="sect">
@@ -548,15 +542,22 @@
         </div>
       </div>
 
-      <!-- ── Gaps tab ── -->
-      <div class="tab-panel" id="tab-gaps">
+      <!-- ── Semantic Search tab ── -->
+      <div class="tab-panel" id="tab-search">
         <div class="pad">
           <div class="card">
-            <div class="sect">
-              Knowledge Gaps
-              <button class="btn sm" style="margin-left:auto" onclick="loadGaps()">Refresh</button>
+            <div class="sect">Semantic Search</div>
+            <div style="display:flex;gap:8px;margin-bottom:16px">
+              <input type="text" id="searchQuery" placeholder="e.g. Zündkerze Drehzahl, spark plug gap, fuel mixture ratio…" style="flex:1"
+                onkeydown="if(event.key==='Enter')runSearch()"/>
+              <select id="searchLimit" class="graph-select">
+                <option value="10">Top 10</option>
+                <option value="20">Top 20</option>
+                <option value="5">Top 5</option>
+              </select>
+              <button class="btn pri" onclick="runSearch()">Search</button>
             </div>
-            <div id="gapsList"><span class="muted">Click Refresh to load open gaps.</span></div>
+            <div id="searchResults"><span class="muted">Enter a query above to search the knowledge base.</span></div>
           </div>
         </div>
       </div>
@@ -568,7 +569,6 @@
 <script>
   const SID = "web-" + Math.random().toString(36).slice(2);
   let last = { q: "", a: "" };
-  let mode = "expert";
   let _abortCtrl = null;
   let _msgCount = 0;
 
@@ -582,7 +582,7 @@
   });
 
   // ── Tab switching ──────────────────────────────────────────────────────
-  const TAB_LABELS = {ask:"Chat",upload:"Upload & Ingest",chunks:"Indexed Chunks",graph:"Knowledge Graph",entities:"Entities",gaps:"Gaps"};
+  const TAB_LABELS = {ask:"Chat",upload:"Upload & Ingest",chunks:"Indexed Chunks",graph:"Knowledge Graph",entities:"Entities",search:"Semantic Search"};
   function switchTab(name) {
     document.querySelectorAll(".navi").forEach(n => n.classList.remove("on"));
     const nav = document.getElementById("nav-" + name);
@@ -591,15 +591,7 @@
     document.getElementById("tab-" + name).classList.add("active");
     document.getElementById("pageTitle").textContent = TAB_LABELS[name] || name;
     if (name === "graph")    loadGraph();
-    if (name === "gaps")     loadGaps();
     if (name === "entities") loadEntities();
-  }
-
-  // ── Mode ─────────────────────────────────────────────────────────────
-  function setMode(m) {
-    mode = m;
-    document.getElementById("btnBeginner").className = "segb" + (m === "beginner" ? " on acc" : "");
-    document.getElementById("btnExpert").className   = "segb" + (m === "expert"   ? " on acc" : "");
   }
 
   // ── Textarea auto-resize ──────────────────────────────────────────────
@@ -711,11 +703,6 @@
     }).catch(() => {});
     fetch("/graph").then(r => r.json()).then(j => { _graphData = j; }).catch(() => {});
     fetch("/entities").then(r => r.json()).then(j => _renderEntities(j)).catch(() => {});
-    fetch("/gaps").then(r => r.json()).then(j => {
-      _renderGaps(j);
-      const n = (j.gaps||[]).length;
-      document.getElementById("gapBadge").textContent = n || "—";
-    }).catch(() => {});
   }
 
   // ── Ask / stream ──────────────────────────────────────────────────────
@@ -762,7 +749,6 @@
     const fd = new FormData();
     fd.append("question",   q);
     fd.append("session_id", SID);
-    fd.append("expertise",  mode);
 
     let firstDelta = true;
     let fullAnswer = "";
@@ -802,11 +788,13 @@
             ansDiv.textContent = "Error: " + ev.text;
           } else if (ev.type === "done") {
             ansDiv.className = "answer";
+            // Replace [Source N] in answer text with clickable superscript refs
+            const citeMap = {};
+            (ev.citations || []).forEach(c => { citeMap[c.n] = c; });
+            ansDiv.innerHTML = _linkifyCitations(fullAnswer, citeMap);
             _renderAnswerFooter(aRow, ansDiv, ev);
+            _renderInlineEvidence(aRow, ev.citations || []);
             _renderSourceCards(ev.citations || []);
-            if (ev.related_questions && ev.related_questions.length) {
-              _renderRelated(aRow, ev.related_questions);
-            }
           }
         }
       }
@@ -837,6 +825,34 @@
         <button class="vbtn dn" onclick="feedback(-1,this)">👎</button>
       </div>`;
     aRow.appendChild(ftr);
+  }
+
+  function _linkifyCitations(text, citeMap) {
+    // Replace [Source N] with a styled superscript that jumps to the chunk
+    return _esc(text).replace(/\[Source (\d+)\]/g, (_, n) => {
+      const c = citeMap[parseInt(n)];
+      const clickable = c && c.id ? `onclick="viewChunk(${c.id})"` : "";
+      return `<cite-ref ${clickable}>[${n}]</cite-ref>`;
+    });
+  }
+
+  function _renderInlineEvidence(aRow, citations) {
+    if (!citations.length) return;
+    const wrap = document.createElement("div");
+    wrap.className = "inline-evidence";
+    wrap.innerHTML = `<div class="inline-evidence-hdr">Evidence (${citations.length} sources)</div>` +
+      citations.map(c => {
+        const page = c.page ? ` · p.${c.page}` : "";
+        const onclick = c.id ? `onclick="viewChunk(${c.id})"` : "";
+        return `<div class="ev-card" ${onclick}>
+          <div class="ev-n">[${c.n}]</div>
+          <div class="ev-body">
+            <div class="ev-filename">${_esc(c.filename || c.doc_id || "unknown")}${page}</div>
+            <div class="ev-snippet">${_esc((c.snippet || "").slice(0, 180))}</div>
+          </div>
+        </div>`;
+      }).join("");
+    aRow.appendChild(wrap);
   }
 
   function _renderRelated(aRow, qs) {
@@ -954,7 +970,16 @@
       const r = await fetch(`/chunks/${id}`);
       const j = await r.json();
       if (j.error) { document.getElementById("chunkContent").textContent = j.error; return; }
-      document.getElementById("chunkContent").textContent = j.content;
+
+      const isTable = (j.metadata||{}).chunk_type === "table" || _looksLikeTable(j.content);
+      const contentEl = document.getElementById("chunkContent");
+      if (isTable) {
+        contentEl.outerHTML = `<div id="chunkContent">${_renderTableChunk(j.content)}</div>`;
+      } else {
+        const el = document.getElementById("chunkContent");
+        el.outerHTML = `<pre id="chunkContent">${_esc(j.content)}</pre>`;
+      }
+
       const refs = (j.source_refs||[]).map(r => r.filename||r.source||JSON.stringify(r)).join(", ");
       document.getElementById("chunkMeta").textContent =
         `id:${j.id} · doc:${j.doc_id} · type:${(j.metadata||{}).chunk_type||"?"} · page:${(j.metadata||{}).page||"?"} · sources:${refs||"none"}`;
@@ -963,12 +988,59 @@
     }
   }
 
+  function _looksLikeTable(content) {
+    const lines = (content || "").split("\n").filter(l => l.trim());
+    const pipeLines = lines.filter(l => l.includes(" | "));
+    return pipeLines.length >= 2;
+  }
+
+  function _renderTableChunk(content) {
+    const lines = content.split("\n").map(l => l.trim()).filter(Boolean);
+    let title = "";
+    let unitsLine = "";
+    const dataLines = [];
+
+    for (const line of lines) {
+      if (line.startsWith("[Table:") && line.endsWith("]")) {
+        title = line.slice(7, -1).trim();
+      } else if (line.startsWith("Units:")) {
+        unitsLine = line.slice(6).trim();
+      } else {
+        dataLines.push(line);
+      }
+    }
+
+    if (!dataLines.length) return `<pre id="chunkContent">${_esc(content)}</pre>`;
+
+    const rows = dataLines.map(l => l.split(" | ").map(c => c.trim()));
+    const header = rows[0];
+    const body = rows.slice(1);
+
+    const titleHtml = title ? `<div class="chunk-table-title">⊞ ${_esc(title)}</div>` : "";
+    const unitsHtml = unitsLine ? `<div class="chunk-table-units">Units: ${_esc(unitsLine)}</div>` : "";
+
+    const thCells = header.map(h => `<th>${_esc(h)}</th>`).join("");
+    const trRows = body.map(row => {
+      const cells = row.map((c, i) => `<td>${_esc(c)}</td>`).join("");
+      return `<tr>${cells}</tr>`;
+    }).join("");
+
+    return `${titleHtml}
+      <div class="chunk-table-wrap">
+        <table class="chunk-table">
+          <thead><tr>${thCells}</tr></thead>
+          <tbody>${trRows}</tbody>
+        </table>
+      </div>
+      ${unitsHtml}`;
+  }
+
   // ── Knowledge graph ───────────────────────────────────────────────────
   const NODE_TYPES = ["engine","system","part","symptom","cause","fix","spec","source","procedure","warning"];
   const EDGE_TYPES = ["HAS_SYSTEM","HAS_PART","HAS_SYMPTOM","CAUSED_BY","FIXED_BY","HAS_SPEC","MENTIONED_IN","EVIDENCED_BY","REQUIRES_PROCEDURE","TESTED_BY","RELATED_TO"];
   const EXTRACTION_METHODS = ["manual_seed","rule","regex","table","llm","unknown"];
   const NODE_COLOR = {
-    engine:"#3fd07a", system:"#56a6ff", part:"#9aa7b5", symptom:"#f0a830",
+    engine:"#56a6ff", system:"#56a6ff", part:"#9aa7b5", symptom:"#f0a830",
     cause:"#e5484d", fix:"#7ee8a2", spec:"#c58cff", source:"#7c8794",
     procedure:"#5dd6c8", warning:"#ff9483", unknown:"#66727e"
   };
@@ -1202,26 +1274,54 @@
   function showGraphNode(node, skipRender) {
     _graphSelected = { kind: "node", id: node.id };
     const edges = (_graphFiltered.edges || []).filter(e => String(_edgeEndpoint(e,"source")) === String(node.id) || String(_edgeEndpoint(e,"target")) === String(node.id));
-    const connected = edges.slice(0, 14).map(e => {
-      const otherId = String(_edgeEndpoint(e,"source")) === String(node.id) ? _edgeEndpoint(e,"target") : _edgeEndpoint(e,"source");
+
+    // Each connection: relation, the other node, confidence, evidence, source + link to chunk.
+    const connected = edges.slice(0, 30).map(e => {
+      const srcId = String(_edgeEndpoint(e,"source"));
+      const isOutgoing = srcId === String(node.id);
+      const otherId = isOutgoing ? _edgeEndpoint(e,"target") : _edgeEndpoint(e,"source");
       const other = _nodeById(otherId) || {};
-      return `<div class="connected-item"><b>${_esc(e.relation || e.type || "RELATED")}</b><br>${_esc(other.label || other.name || otherId)} <span class="muted">(${_esc(other.type || "unknown")})</span></div>`;
+      const rel = _esc(e.relation || e.type || "RELATED");
+      const arrow = isOutgoing ? "→" : "←";
+      const conf = _edgeConfidence(e);
+      const confBadge = conf === null ? "" : `<span class="kg-badge">${Math.round(conf*100)}%</span>`;
+      const ev = e.evidence || (e.props || {}).evidence || "";
+      const evSnip = ev ? `<div class="evidence-box" style="margin-top:6px">"${_esc(ev.slice(0,220))}${ev.length>220?'…':''}"</div>` : "";
+      const title = e.source_title || (e.props||{}).source_title || e.doc_id || (e.props||{}).doc_id || "";
+      const page = e.page ?? (e.props||{}).page;
+      const chunkId = e.source_chunk_id || e.chunk_id || (e.props||{}).source_chunk_id || (e.props||{}).chunk_id;
+      const srcLine = (title || chunkId)
+        ? `<div class="muted" style="margin-top:5px;font-size:11px">${title ? "📄 " + _esc(title) : ""}${page!=null?` · p.${_esc(page)}`:""}${chunkId?` · <a href="/chunks/${_esc(chunkId)}/view" target="_blank" style="color:var(--grn)">view source →</a>`:""}</div>`
+        : "";
+      return `<div class="connected-item">
+        <b>${rel}</b> ${arrow} ${_esc(other.label || other.name || otherId)} <span class="muted">(${_esc(other.type || "unknown")})</span> ${confBadge}
+        ${evSnip}${srcLine}
+      </div>`;
     }).join("") || '<div class="connected-item">No visible connections under current filters.</div>';
+
     const aliases = Array.isArray(node.aliases) && node.aliases.length ? node.aliases.join(", ") : "none";
+    // Source documents seen across this node's connections (titles, de-duplicated).
+    const docTitles = [...new Set(edges.map(e => e.source_title || (e.props||{}).source_title).filter(Boolean))];
+    const docsLine = docTitles.length ? docTitles.map(_esc).join(", ")
+                     : ((node.doc_ids || []).join(", ") || "none stored");
+    const definition = node.definition || (node.props || {}).definition || (node.props || {}).description || "";
+
     document.getElementById("graphInspector").innerHTML = `
       <div class="inspector-title">${_esc(node.label || node.name || "Unknown node")}</div>
       <div class="inspector-sub">Node ${_esc(node.id)}</div>
       <div class="badge-row">
         <span class="kg-badge good">${_esc(node.type || "unknown")}</span>
         ${_confidenceBadge(_edgeConfidence(node))}
-        <span class="kg-badge">${_esc(node.source_count ?? 0)} sources</span>
+        <span class="kg-badge">${_esc(node.source_count ?? docTitles.length ?? 0)} sources</span>
+        <span class="kg-badge">${edges.length} connections</span>
       </div>
+      ${definition ? `<div class="evidence-box" style="margin:10px 0">${_esc(definition)}</div>` : ""}
       <div class="kg-kv">
         <div class="k">Canonical</div><div class="v">${_esc(node.canonical_name || node.label || node.name || "unknown")}</div>
         <div class="k">Aliases</div><div class="v">${_esc(aliases)}</div>
-        <div class="k">Doc IDs</div><div class="v">${_esc((node.doc_ids || []).join(", ") || "none stored")}</div>
+        <div class="k">Source docs</div><div class="v">${docsLine}</div>
       </div>
-      <div class="inspector-sub" style="margin-top:14px">Visible connections</div>
+      <div class="inspector-sub" style="margin-top:14px">Connections &amp; evidence (${edges.length})</div>
       <div class="connected-list">${connected}</div>
     `;
     if (!skipRender) _renderGraph(_graphFiltered, (document.getElementById("graphSearch")?.value || "").trim().toLowerCase());
@@ -1290,65 +1390,6 @@
     el.innerHTML = html;
   }
 
-  // ── Diagnostic paths ─────────────────────────────────────────────────
-  function searchDiagnosticQuery(q) {
-    document.getElementById("diagQuery").value = q;
-    searchDiagnostic();
-  }
-
-  async function searchDiagnostic() {
-    const q = document.getElementById("diagQuery").value.trim();
-    const el = document.getElementById("diagResults");
-    if (!q) { el.innerHTML = '<span class="muted">Enter a symptom to search.</span>'; return; }
-    el.innerHTML = '<span class="spinner"></span>';
-    try {
-      const r = await fetch(`/graph/diagnostic-paths?query=${encodeURIComponent(q)}&limit=8`);
-      const j = await r.json();
-      _renderDiagnosticPaths(j, el);
-    } catch (e) {
-      el.innerHTML = `<span class="muted">Error: ${e.message}</span>`;
-    }
-  }
-
-  function _renderDiagnosticPaths(j, el) {
-    const paths = j.paths || [];
-    if (!paths.length) {
-      el.innerHTML = `<p class="muted">No diagnostic paths found for "<strong>${j.query||''}</strong>".<br>
-        The seed ontology populates on first ingest. Upload a document to enrich with document-backed paths.</p>`;
-      return;
-    }
-    el.innerHTML = paths.map(p => {
-      const parts = (p.path || "").split(/\s+--[^-]+-+>\s*/);
-      const relations = [...(p.path || "").matchAll(/--([^-]+)-->/g)].map(m => m[1]);
-      const nodeHtml = parts.map((part, i) => {
-        const nodeType = _guessNodeType(part, i, parts.length);
-        const arrow = i < relations.length ? `<span class="diag-arrow">──${relations[i]}──▶</span>` : "";
-        return `<span class="diag-node ${nodeType}">${part}</span>${arrow}`;
-      }).join(" ");
-      const conf = p.confidence != null ? parseFloat(p.confidence) : null;
-      const confHtml = conf != null
-        ? `<span class="diag-conf"><div class="diag-bar"><i style="width:${Math.round(conf*100)}%"></i></div>${(conf*100).toFixed(0)}%</span>`
-        : "";
-      const src = p.source_title ? `<span>📄 ${p.source_title}${p.page ? ` p.${p.page}` : ""}</span>` : "";
-      const method = p.extraction_method ? `<span>${p.extraction_method}</span>` : "";
-      const evidence = p.evidence ? `<div class="diag-evidence">"${p.evidence.slice(0,200)}${p.evidence.length>200?'…':''}"</div>` : "";
-      return `<div class="diag-card">
-        <div class="diag-path">${nodeHtml}</div>
-        <div class="diag-meta">${confHtml}${src}${method}</div>
-        ${evidence}
-      </div>`;
-    }).join("");
-  }
-
-  function _guessNodeType(label, idx, total) {
-    const l = label.toLowerCase();
-    if (idx === 0) return "symptom";
-    if (idx === total - 1) return "fix";
-    if (/fouling|leak|weak|block|restriction|compression|timing|buildup/.test(l)) return "cause";
-    if (/spark|carb|filter|pump|piston|cylinder|fan|coil|valve|sensor|ring|shaft/.test(l)) return "part";
-    return "cause";
-  }
-
   // ── KG Quality ───────────────────────────────────────────────────────
   async function loadKgQuality() {
     const el = document.getElementById("kgQualityContent");
@@ -1391,43 +1432,42 @@
       ${j.noisy_unknown_nodes&&j.noisy_unknown_nodes.length?`<div style="margin-top:12px"><div class="lbl" style="margin-bottom:6px">⚠ Unknown/noisy nodes</div><div style="font-family:var(--mono);font-size:11px;color:var(--tx3)">${j.noisy_unknown_nodes.join(', ')}</div></div>`:''}`;
   }
 
-  // ── Gaps ──────────────────────────────────────────────────────────────
-  async function loadGaps() {
-    const el = document.getElementById("gapsList");
-    el.innerHTML = '<span class="spinner"></span>';
+  // ── Semantic Search ───────────────────────────────────────────────────
+  async function runSearch() {
+    const q = document.getElementById("searchQuery").value.trim();
+    const limit = document.getElementById("searchLimit").value;
+    const el = document.getElementById("searchResults");
+    if (!q) return;
+    el.innerHTML = '<span class="spinner"></span> Searching…';
     try {
-      const r = await fetch("/gaps");
+      const r = await fetch(`/search?q=${encodeURIComponent(q)}&limit=${limit}`);
       const j = await r.json();
-      _renderGaps(j, el);
-      document.getElementById("gapBadge").textContent = (j.gaps||[]).length || "—";
+      if (j.error && !j.results.length) {
+        el.innerHTML = `<span class="muted">Error: ${j.error}</span>`; return;
+      }
+      if (!j.results.length) {
+        el.innerHTML = '<span class="muted">No results found. Try a different query or upload more documents.</span>'; return;
+      }
+      const mode = j.mode === "fulltext_fallback" ? ' <span style="color:var(--amb);font-family:var(--mono);font-size:10px">(full-text fallback)</span>' : '';
+      el.innerHTML = `<div class="lbl" style="margin-bottom:10px">${j.results.length} results${mode}</div>` +
+        j.results.map((r, i) => {
+          const ext = (r.filename || r.doc_id || "").split(".").pop().toUpperCase() || "DOC";
+          const fmtCls = _fmtClass(r.filename || r.doc_id || "");
+          const score = (r.score * 100).toFixed(1);
+          const page = r.metadata?.page ? ` · p.${r.metadata.page}` : "";
+          return `<div class="srccard" onclick="viewChunk(${r.id})" style="margin-bottom:8px">
+            <div class="srccard-top">
+              <span class="tag ${fmtCls}">${ext}</span>
+              <span class="srccard-name">${r.filename || r.doc_id || "unknown"}</span>
+              <span class="srccard-page">${page}</span>
+              <span style="margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--grn)">${score}%</span>
+            </div>
+            <div class="srccard-snippet">${r.snippet}</div>
+          </div>`;
+        }).join("");
     } catch (e) {
       el.innerHTML = `<span class="muted">Error: ${e.message}</span>`;
     }
-  }
-
-  function _renderGaps(j, el) {
-    el = el || document.getElementById("gapsList");
-    if (!el) return;
-    if (!j.gaps||!j.gaps.length) {
-      el.innerHTML = '<p class="muted" style="padding:16px 0">No open gaps. Ask questions to generate knowledge gaps when the evidence is weak.</p>';
-      return;
-    }
-    el.innerHTML = j.gaps.map(g => `
-      <div class="gap-row" id="gap-${g.id}">
-        <div class="gap-question">
-          <strong>Q:</strong> ${g.question}
-          <div class="gap-reason">${g.reason} · ${new Date(g.created_at).toLocaleDateString()}</div>
-        </div>
-        <button class="btn sm" onclick="resolveGap(${g.id})">Resolve</button>
-      </div>`).join("");
-  }
-
-  async function resolveGap(id) {
-    try {
-      await fetch(`/gaps/${id}/resolve`, { method: "POST" });
-      const row = document.getElementById("gap-" + id);
-      if (row) { row.style.opacity = ".35"; row.querySelector("button").disabled = true; }
-    } catch (e) { alert("Failed: " + e.message); }
   }
 
   // Initial data refresh

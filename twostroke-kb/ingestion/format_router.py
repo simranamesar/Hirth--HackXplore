@@ -97,8 +97,21 @@ def route(path: str | Path) -> ParsedDoc:
             doc = ocr_parser.parse(path)
     elif handler == "doc_legacy":
         from .parsers import doc_convert
+        import shutil
 
-        doc = doc_convert.parse(path)
+        if not shutil.which("libreoffice") and not shutil.which("antiword"):
+            log.warning(
+                "route: skipping '%s' — neither libreoffice nor antiword found. "
+                "Run: sudo apt-get install -y libreoffice-headless",
+                path.name,
+            )
+            doc = ParsedDoc(
+                text=f"[Could not parse {path.name}: libreoffice or antiword is not installed.]",
+                metadata={"filename": path.name, "type": "doc", "parse_error": "missing_converter"},
+                source_ref={"filename": path.name},
+            )
+        else:
+            doc = doc_convert.parse(path)
     elif handler == "docx":
         from .parsers import docx_parser
 

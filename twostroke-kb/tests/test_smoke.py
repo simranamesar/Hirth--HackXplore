@@ -953,18 +953,16 @@ def test_graph_answer_beginner_mode():
     assert result["confidence"] in ("high", "low")
 
 
-def test_api_health_and_gaps_endpoints():
-    """Health endpoint returns ok; /gaps returns the expected shape when DB is unavailable."""
+def test_api_health_endpoint():
+    """Health endpoint returns ok; the removed /gaps endpoint now 404s."""
     from fastapi.testclient import TestClient
     from api.main import app
 
     client = TestClient(app)
     assert client.get("/health").json() == {"ok": True}
 
-    # /gaps without a DB returns the graceful error shape
-    resp = client.get("/gaps")
-    data = resp.json()
-    assert "gaps" in data
+    # /gaps was removed with the Knowledge Gaps feature
+    assert client.get("/gaps").status_code == 404
 
 
 def test_api_graph_endpoint():
