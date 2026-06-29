@@ -13,6 +13,7 @@ from .types import ParsedDoc, Table
 
 # Sentinel pattern inserted by pdf_parser between pages
 _PAGE_BREAK_RE = re.compile(r"\[PAGE_BREAK:(\d+)\]")
+_SLIDE_RE = re.compile(r"---\s*Slide\s+(\d+)\s*---", re.IGNORECASE)
 
 # Sentence boundary: period/!/?  followed by whitespace or end-of-string
 _SENTENCE_END_RE = re.compile(r"[.!?](?:\s|$)|\n\n")
@@ -63,6 +64,21 @@ def _page_at(offset: int, page_map: dict[int, int]) -> int:
     return page
 
 
+def _build_slide_map(text: str) -> dict[int, int]:
+    """Return {char_offset: slide_num} for PPTX slide headers, if present."""
+    return {m.start(): int(m.group(1)) for m in _SLIDE_RE.finditer(text)}
+
+
+def _slide_at(offset: int, slide_map: dict[int, int]) -> int | None:
+    slide = None
+    for start, num in sorted(slide_map.items()):
+        if start <= offset:
+            slide = num
+        else:
+            break
+    return slide
+
+
 def _extend_to_sentence(text: str, end: int, max_extra: int = 150) -> int:
     """Extend end position forward to the nearest sentence boundary, up to max_extra chars."""
     limit = min(end + max_extra, len(text))
@@ -86,6 +102,7 @@ def chunk(doc: ParsedDoc, size: int = 700, overlap: int = 100) -> list[dict[str,
 
     # Strip page sentinels and build offset→page map
     text, page_map = _build_page_map(doc.text)
+    slide_map = _build_slide_map(text)
     base_ref = dict(doc.source_ref)  # shallow copy so we can add "page"
 
     step = size - overlap
@@ -96,11 +113,16 @@ def chunk(doc: ParsedDoc, size: int = 700, overlap: int = 100) -> list[dict[str,
         content = text[pos:end].strip()
         if content:
             page = _page_at(pos, page_map)
+            slide = _slide_at(pos, slide_map)
             ref = {**base_ref, "page": page}
+            if slide is not None:
+                ref["slide"] = slide
+            metadata = {**doc.metadata, "chunk_index": idx, "chunk_type": "prose", "page": page}
+            if slide is not None:
+                metadata["slide"] = slide
             chunks.append({
                 "content": content,
-                "metadata": {**doc.metadata, "chunk_index": idx, "chunk_type": "prose",
-                              "page": page},
+                "metadata": metadata,
                 "source_refs": [ref],
             })
             idx += 1

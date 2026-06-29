@@ -35,6 +35,134 @@ def health() -> dict:
     return {"ok": True}
 
 
+@app.post("/inventory/scan")
+async def inventory_scan(
+    root_path: str = Form(...),
+    max_files: int = Form(50000),
+) -> JSONResponse:
+    """Metadata-only scan of a local corpus folder.
+
+    This does not parse, chunk, embed, or run KG extraction. It only catalogs
+    file metadata so large corpora can be filtered before selective ingestion.
+    """
+    import asyncio
+
+    try:
+        from ingestion.inventory import scan_inventory
+
+        result = await asyncio.to_thread(scan_inventory, root_path, max_files)
+        return JSONResponse(result)
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+
+
+@app.get("/inventory")
+def inventory_list(
+    batch_id: str | None = None,
+    limit: int = 200,
+    offset: int = 0,
+) -> JSONResponse:
+    """List inventory rows from the metadata catalog."""
+    try:
+        from ingestion.inventory import list_inventory
+
+        return JSONResponse({
+            "items": list_inventory(batch_id=batch_id, limit=limit, offset=offset),
+            "batch_id": batch_id,
+            "limit": limit,
+            "offset": offset,
+        })
+    except Exception as exc:
+        return JSONResponse({"items": [], "error": str(exc)})
+
+
+@app.get("/inventory/summary")
+def inventory_get_summary(batch_id: str | None = None) -> JSONResponse:
+    """Return inventory rollups by topic, category, extension, and status."""
+    try:
+        from ingestion.inventory import inventory_summary
+
+        return JSONResponse(inventory_summary(batch_id=batch_id))
+    except Exception as exc:
+        return JSONResponse({
+            "batch_id": batch_id,
+            "total_files": 0,
+            "total_size_bytes": 0,
+            "by_topic": [],
+            "by_category": [],
+            "by_extension": [],
+            "by_status": [],
+            "error": str(exc),
+        })
+
+
+def _split_csv(value: str | None) -> list[str]:
+    if not value:
+        return []
+    return [part.strip() for part in value.split(",") if part.strip()]
+
+
+def _split_ids(value: str | None) -> list[int]:
+    ids: list[int] = []
+    for part in _split_csv(value):
+        try:
+            ids.append(int(part))
+        except ValueError:
+            continue
+    return ids
+
+
+@app.post("/inventory/ingest-selected")
+async def inventory_ingest_selected(
+    topic: str = Form(""),
+    extensions: str = Form(""),
+    inventory_ids: str = Form(""),
+    max_files: int = Form(25),
+    max_file_size_mb: int = Form(50),
+    skip_existing: bool = Form(True),
+    kg_enabled: bool = Form(False),
+    kg_max_chunks_per_doc: int = Form(20),
+    dry_run: bool = Form(True),
+) -> JSONResponse:
+    """Dry-run or ingest a controlled selection from the metadata inventory."""
+    import asyncio
+
+    try:
+        from ingestion.inventory import dry_run_selected, ingest_selected
+
+        kwargs = {
+            "topic": topic.strip() or None,
+            "extensions": _split_csv(extensions),
+            "inventory_ids": _split_ids(inventory_ids),
+            "max_files": max(1, min(max_files, 500)),
+            "max_file_size_mb": max(1, min(max_file_size_mb, 2048)),
+            "skip_existing": skip_existing,
+        }
+        if dry_run:
+            result = await asyncio.to_thread(dry_run_selected, **kwargs)
+        else:
+            result = await asyncio.to_thread(
+                ingest_selected,
+                **kwargs,
+                kg_enabled=kg_enabled,
+                kg_max_chunks_per_doc=max(0, min(kg_max_chunks_per_doc, 100)),
+            )
+        return JSONResponse(result)
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+
+
+@app.get("/inventory/jobs/{job_id}")
+def inventory_job_status(job_id: str) -> JSONResponse:
+    """Return persisted progress for a selective inventory ingestion job."""
+    try:
+        from ingestion.inventory import get_ingestion_job
+
+        return JSONResponse(get_ingestion_job(job_id))
+    except Exception as exc:
+        return JSONResponse({"job_id": job_id, "status": "error", "error": str(exc)}, status_code=500)
+
+
 @app.post("/upload")
 async def upload(file: UploadFile = File(...)) -> JSONResponse:
     """Save the upload and run the ingestion pipeline (non-streaming fallback)."""
@@ -196,6 +324,7 @@ def _sse(data: dict) -> str:
 def _stream_answer(
     question: str,
     session_id: str,
+    topic: str | None = None,
 ) -> Generator[str, None, None]:
     """Sync generator yielding SSE events for /ask/stream.
 
@@ -240,7 +369,7 @@ def _stream_answer(
         kg_result = {"intent": {"intent": "general_question"}, "paths": [], "graph_evidence": [], "context": ""}
 
     try:
-        chunks = search(search_query, k=settings.retrieve_top_k)
+        chunks = search(search_query, k=settings.retrieve_top_k, topic=(topic or None))
     except Exception:
         chunks = []
 
@@ -271,9 +400,16 @@ def _stream_answer(
     for i, c in enumerate(chunks, 1):
         source_refs = c.get("source_refs") or [{}]
         ref = source_refs[0] if source_refs else {}
+        metadata = c.get("metadata") or {}
         label = ref.get("filename") or c.get("doc_id") or "unknown"
         page = ref.get("page", "")
-        cite_label = f"{label} p.{page}" if page else label
+        slide = ref.get("slide") or metadata.get("slide")
+        sheet = ref.get("sheet") or metadata.get("sheet") or metadata.get("table_name")
+        source_topic = metadata.get("topic") or ref.get("topic")
+        location = f"p.{page}" if page else f"slide {slide}" if slide else f"sheet {sheet}" if sheet else ""
+        cite_label = f"{label} {location}".strip()
+        if source_topic:
+            cite_label = f"{source_topic} / {cite_label}"
         context_lines.append(f"[Source {i}] ({cite_label})\n{c['content']}")
         citations.append({
             "n": i,
@@ -281,6 +417,11 @@ def _stream_answer(
             "doc_id": c.get("doc_id", ""),
             "filename": label,
             "page": page,
+            "slide": slide,
+            "sheet": sheet,
+            "topic": source_topic,
+            "relative_path": metadata.get("relative_path") or ref.get("relative_path"),
+            "source_title": metadata.get("source_title") or ref.get("source_title") or label,
             "snippet": c["content"][:200],
         })
 
@@ -369,6 +510,7 @@ def _stream_answer(
 def ask_stream(
     question: str = Form(...),
     session_id: str = Form("anon"),
+    topic: str = Form(""),
 ) -> StreamingResponse:
     """Streaming version of /ask using Server-Sent Events.
 
@@ -376,7 +518,7 @@ def ask_stream(
     Falls back gracefully to an empty done event when retrieval returns nothing.
     """
     return StreamingResponse(
-        _stream_answer(question, session_id=session_id),
+        _stream_answer(question, session_id=session_id, topic=topic.strip() or None),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
@@ -653,6 +795,9 @@ def serialize_graph_edge(edge_id: int, src_id: int, dst_id: int, relation: str, 
     extraction_method = props.get("extraction_method") or "unknown"
     evidence = str(props.get("evidence") or "")
     chunk_id = props.get("source_chunk_id", props.get("chunk_id"))
+    topic = props.get("topic")
+    relative_path = props.get("relative_path")
+    file_type = props.get("file_type")
     return {
         "id": edge_id,
         "source": src_id,
@@ -667,6 +812,9 @@ def serialize_graph_edge(edge_id: int, src_id: int, dst_id: int, relation: str, 
         "chunk_id": chunk_id,
         "page": props.get("page"),
         "source_title": props.get("source_title"),
+        "topic": topic,
+        "relative_path": relative_path,
+        "file_type": file_type,
         "props": {
             "doc_id": props.get("doc_id"),
             "source_chunk_id": chunk_id,
@@ -676,6 +824,9 @@ def serialize_graph_edge(edge_id: int, src_id: int, dst_id: int, relation: str, 
             "confidence": confidence,
             "extraction_method": extraction_method,
             "source_title": props.get("source_title"),
+            "topic": topic,
+            "relative_path": relative_path,
+            "file_type": file_type,
             **props,
         },
     }
@@ -686,6 +837,7 @@ def get_graph(
     node_type: str | None = None,
     edge_type: str | None = None,
     doc_id: str | None = None,
+    topic: str | None = None,
     min_confidence: float = 0.4,
     extraction_method: str | None = None,
     include_seed: bool = True,
@@ -697,6 +849,7 @@ def get_graph(
     try:
         limit = max(1, min(int(limit), 2000))
         min_confidence = max(0.0, min(1.0, float(min_confidence)))
+        topic = (topic or "").strip() or None
         conn = get_connection()
         try:
             cur = conn.cursor()
@@ -729,6 +882,8 @@ def get_graph(
                     continue
                 if doc_id and edge.get("doc_id") != doc_id:
                     continue
+                if topic and edge.get("topic") != topic:
+                    continue
                 if extraction_method and edge["extraction_method"] != extraction_method:
                     continue
                 if not include_seed and edge["extraction_method"] == "manual_seed":
@@ -744,9 +899,14 @@ def get_graph(
             if node_type or doc_id:
                 edges = [e for e in edges if e["source"] in valid_ids and e["target"] in valid_ids]
                 edge_node_ids = {nid for e in edges for nid in (e["source"], e["target"])}
+            if topic:
+                valid_ids = edge_node_ids
             else:
                 valid_ids = edge_node_ids or valid_ids
-            nodes = [n for n in nodes if n["id"] in valid_ids or not edges]
+            if topic:
+                nodes = [n for n in nodes if n["id"] in valid_ids]
+            else:
+                nodes = [n for n in nodes if n["id"] in valid_ids or not edges]
         finally:
             conn.close()
 
@@ -757,6 +917,7 @@ def get_graph(
                 "node_type": node_type,
                 "edge_type": edge_type,
                 "doc_id": doc_id,
+                "topic": topic,
                 "min_confidence": min_confidence,
                 "extraction_method": extraction_method,
                 "include_seed": include_seed,
@@ -880,8 +1041,81 @@ def graph_quality() -> JSONResponse:
         })
 
 
+@app.get("/topics")
+def topics() -> JSONResponse:
+    """Return known corpus topics from indexed chunks, inventory, and demo presets."""
+    from config import get_connection
+
+    preset_topics = [
+        "CAD",
+        "Verbrennungsmotoren",
+        "Oberflächenbehandlung",
+        "Elektrotechnik",
+        "Aluminiumguss",
+        "Propeller",
+        "Konstruktionslehre",
+        "Werkstoffkunde",
+        "Luftfahrt",
+        "Sonst. Stoffe",
+        "Normen DIN ISO VDI FAR ASTM LURS",
+        "Relevante Hirth-Information _ alt",
+        "Vorlagen Testprotokolle",
+        "Bauteilsicherheit und -zuverlaellisgkeit",
+        "Schulungen",
+        "Bachelor_Master_Diplom_Doktorarbeiten",
+        "Vibrationen",
+        "Drehmomente",
+        "Feinstellung-Zweitaktmotor",
+    ]
+    topic_map = {name: {"topic": name, "chunks": 0, "inventory_files": 0, "size_bytes": 0} for name in preset_topics}
+
+    try:
+        conn = get_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT metadata->>'topic' AS topic, COUNT(*)
+                FROM chunks
+                WHERE metadata ? 'topic' AND COALESCE(metadata->>'topic', '') <> ''
+                GROUP BY topic
+                """
+            )
+            for topic_name, count in cur.fetchall():
+                row = topic_map.setdefault(topic_name, {"topic": topic_name, "chunks": 0, "inventory_files": 0, "size_bytes": 0})
+                row["chunks"] = int(count or 0)
+
+            cur.execute(
+                """
+                SELECT topic, COUNT(*), COALESCE(SUM(size_bytes), 0)
+                FROM file_inventory
+                WHERE COALESCE(topic, '') <> ''
+                GROUP BY topic
+                """
+            )
+            for topic_name, count, size_bytes in cur.fetchall():
+                row = topic_map.setdefault(topic_name, {"topic": topic_name, "chunks": 0, "inventory_files": 0, "size_bytes": 0})
+                row["inventory_files"] = int(count or 0)
+                row["size_bytes"] = int(size_bytes or 0)
+        finally:
+            conn.close()
+    except Exception:
+        pass
+
+    presets = [
+        {"label": "Engine troubleshooting", "topic": "Verbrennungsmotoren", "question": "What are the likely causes and fixes for engine misfire?"},
+        {"label": "Torque specs", "topic": "Drehmomente", "question": "What torque specifications are available?"},
+        {"label": "Vibration", "topic": "Vibrationen", "question": "What vibration issues and checks are documented?"},
+        {"label": "Two-stroke fine tuning", "topic": "Feinstellung-Zweitaktmotor", "question": "What should I check for two-stroke fine tuning?"},
+        {"label": "Standards/certification", "topic": "Normen DIN ISO VDI FAR ASTM LURS", "question": "Which standards or certification requirements are referenced?"},
+        {"label": "Propeller", "topic": "Propeller", "question": "What propeller-related guidance is available?"},
+    ]
+    rows = sorted(topic_map.values(), key=lambda r: r["topic"].casefold())
+    return JSONResponse({"topics": rows, "presets": presets})
+
+
 @app.get("/search")
-def semantic_search(q: str, limit: int = 10) -> JSONResponse:
+def semantic_search(q: str, limit: int = 10, topic: str | None = None) -> JSONResponse:
     """Hybrid BM25 + dense semantic search over indexed chunks."""
     import json as _j
     from config import get_connection
@@ -889,37 +1123,52 @@ def semantic_search(q: str, limit: int = 10) -> JSONResponse:
     if not q or not q.strip():
         return JSONResponse({"results": [], "error": "empty query"})
 
+    topic = (topic or "").strip() or None
     try:
-        from agent.retriever_hybrid import HybridRetriever
-        retriever = HybridRetriever()
-        hits = retriever.search(q.strip(), top_k=limit)
+        from agent.retriever_hybrid import search as hybrid_search
+
+        hits = hybrid_search(q.strip(), k=limit, topic=topic)
         results = []
         for h in hits:
+            metadata = h.get("metadata", {}) or {}
+            refs = h.get("source_refs") or [{}]
+            ref = refs[0] if refs else {}
             results.append({
                 "id":       h.get("id"),
                 "doc_id":   h.get("doc_id", ""),
                 "score":    round(float(h.get("score", 0)), 4),
                 "snippet":  (h.get("content") or h.get("snippet") or "")[:300],
-                "metadata": h.get("metadata", {}),
-                "filename": h.get("filename") or (h.get("source_refs") or [{}])[0].get("filename", ""),
+                "metadata": metadata,
+                "filename": h.get("filename") or ref.get("filename", ""),
+                "topic": metadata.get("topic") or ref.get("topic"),
+                "source_title": metadata.get("source_title") or ref.get("source_title") or ref.get("filename", ""),
+                "page": ref.get("page") or metadata.get("page"),
+                "slide": ref.get("slide") or metadata.get("slide"),
+                "sheet": ref.get("sheet") or metadata.get("sheet") or metadata.get("table_name"),
             })
-        return JSONResponse({"results": results})
+        return JSONResponse({"results": results, "topic": topic})
     except Exception as exc:
         # Fallback: plain SQL full-text search
         try:
             conn = get_connection()
             try:
                 cur = conn.cursor()
+                where_topic = "AND metadata->>'topic' = %s" if topic else ""
+                params = [q, q]
+                if topic:
+                    params.append(topic)
+                params.append(limit)
                 cur.execute(
-                    """
+                    f"""
                     SELECT id, doc_id, content, metadata, source_refs,
                            ts_rank_cd(to_tsvector('simple', content),
                                       plainto_tsquery('simple', %s)) AS rank
                     FROM chunks
                     WHERE to_tsvector('simple', content) @@ plainto_tsquery('simple', %s)
+                    {where_topic}
                     ORDER BY rank DESC LIMIT %s
                     """,
-                    (q, q, limit),
+                    tuple(params),
                 )
                 rows = cur.fetchall()
             finally:
@@ -928,7 +1177,8 @@ def semantic_search(q: str, limit: int = 10) -> JSONResponse:
             for r in rows:
                 meta = r[3] if isinstance(r[3], dict) else _j.loads(r[3] or "{}")
                 refs = r[4] if isinstance(r[4], list) else _j.loads(r[4] or "[]")
-                filename = (refs[0].get("filename") or refs[0].get("source") or "") if refs else ""
+                ref = refs[0] if refs else {}
+                filename = (ref.get("filename") or ref.get("source") or "") if refs else ""
                 results.append({
                     "id":       r[0],
                     "doc_id":   r[1],
@@ -936,8 +1186,13 @@ def semantic_search(q: str, limit: int = 10) -> JSONResponse:
                     "snippet":  r[2][:300],
                     "metadata": meta,
                     "filename": filename,
+                    "topic": meta.get("topic") or ref.get("topic"),
+                    "source_title": meta.get("source_title") or ref.get("source_title") or filename,
+                    "page": ref.get("page") or meta.get("page"),
+                    "slide": ref.get("slide") or meta.get("slide"),
+                    "sheet": ref.get("sheet") or meta.get("sheet") or meta.get("table_name"),
                 })
-            return JSONResponse({"results": results, "mode": "fulltext_fallback"})
+            return JSONResponse({"results": results, "mode": "fulltext_fallback", "topic": topic})
         except Exception as exc2:
             return JSONResponse({"results": [], "error": str(exc2)})
 

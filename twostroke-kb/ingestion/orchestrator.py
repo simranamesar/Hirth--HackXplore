@@ -8,9 +8,11 @@ so the provenance trail remains intact without touching existing chunks.
 from __future__ import annotations
 
 import logging
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 log = logging.getLogger(__name__)
 
@@ -58,7 +60,12 @@ def _register_document(doc_id: str, filename: str, lang: str, storage_uri: str |
         conn.close()
 
 
-def run_ingestion(path: str | Path) -> IngestResult:
+def run_ingestion(
+    path: str | Path,
+    extra_metadata: dict[str, Any] | None = None,
+    kg_enabled: bool = True,
+    kg_max_chunks_per_doc: int | None = None,
+) -> IngestResult:
     """Run the full ingestion pipeline for one uploaded file. Synchronous.
 
     Returns IngestResult with chunk count, fact count, duplicate count, and version.
@@ -70,6 +77,12 @@ def run_ingestion(path: str | Path) -> IngestResult:
 
     # 1. Parse
     doc = format_router.route(path)
+    if extra_metadata:
+        doc.metadata.update(extra_metadata)
+        doc.source_ref.update({
+            k: v for k, v in extra_metadata.items()
+            if k in {"topic", "relative_path", "file_type", "source_title"}
+        })
 
     # 2. Register document version (best-effort; never block ingestion)
     version = 1
@@ -108,11 +121,21 @@ def run_ingestion(path: str | Path) -> IngestResult:
     # 8. Store chunks + structured_facts
     knowledge_base.store(chunks)
 
-    # 9. Graph extraction (best-effort; LLM failure → skip silently)
-    try:
-        graph_builder.extract(clean, chunks=chunks)
-    except Exception:
-        log.warning("orchestrator: graph_builder failed for %s; continuing", path.name)
+    # 9. Graph extraction (best-effort; optional for large batch ingestion)
+    if kg_enabled:
+        old_kg_limit = os.environ.get("KG_MAX_CHUNKS_PER_DOC")
+        if kg_max_chunks_per_doc is not None:
+            os.environ["KG_MAX_CHUNKS_PER_DOC"] = str(max(0, int(kg_max_chunks_per_doc)))
+        try:
+            graph_builder.extract(clean, chunks=chunks)
+        except Exception:
+            log.warning("orchestrator: graph_builder failed for %s; continuing", path.name)
+        finally:
+            if kg_max_chunks_per_doc is not None:
+                if old_kg_limit is None:
+                    os.environ.pop("KG_MAX_CHUNKS_PER_DOC", None)
+                else:
+                    os.environ["KG_MAX_CHUNKS_PER_DOC"] = old_kg_limit
 
     fact_count = sum(
         1 for c in chunks if c["metadata"].get("chunk_type") == "table"

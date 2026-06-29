@@ -48,6 +48,32 @@ Or use the shortcuts: `make setup`, `make db`, `make run`, `make test`.
 
 Two LangGraph graphs — a format-aware ingestion pipeline and a ReAct diagnostic agent — over a single Postgres+pgvector store. Full design in `docs/ARCHITECTURE.md` (diagram) and `docs/PLAN.md` (rationale, X-factor, build order). All LLM calls go through `llm.py`.
 
+## Large Corpus Demo Flow
+
+For the Hirth company corpus scale (around 47,000 files / 306 GB), do **not** ingest everything at once.
+
+Use the safe large-corpus flow:
+
+1. Open **Corpus Inventory**.
+2. Enter the local corpus root folder.
+3. Run **Scan Metadata**. This only records file metadata; it does not parse, embed, or build KG facts.
+4. Review topic counts, supported/unsupported files, and file-type breakdown.
+5. Select one topic, for example `Verbrennungsmotoren`, `Drehmomente`, `Vibrationen`, `Normen DIN ISO VDI FAR ASTM LURS`, `Propeller`, or `Feinstellung-Zweitaktmotor`.
+6. Run **Dry Run** with a small limit, such as 5 to 25 files.
+7. Start a small controlled batch only after the dry run looks right.
+8. Use chat/search/KG topic filters to keep the demo focused.
+
+Demo-safe defaults:
+
+- Inventory scan is metadata-only.
+- Batch ingestion defaults to 25 files.
+- Max file size defaults to 50 MB.
+- Unsupported CAD/archive files stay metadata-only and are skipped by ingestion.
+- KG extraction is off by default for inventory batch ingestion; enable it only for small selected batches.
+- Individual file failures are recorded and should not stop the whole batch.
+
+PowerPoint note: `.pptx` is supported for text extraction. Slide text is extracted with slide numbers so answers can cite slide-based sources when the chunk metadata is present.
+
 ## Non-negotiables
 
 - **Never invent numbers.** Cite the source cell/clause; the verifier rejects unsupported numeric claims.

@@ -29,6 +29,60 @@ CREATE TABLE IF NOT EXISTS chunks (
 CREATE INDEX IF NOT EXISTS chunks_embedding_idx
     ON chunks USING hnsw (embedding vector_cosine_ops);
 
+-- metadata-only large corpus inventory (no parsing/embedding during scan)
+CREATE TABLE IF NOT EXISTS file_inventory (
+    id                   BIGSERIAL PRIMARY KEY,
+    batch_id             TEXT NOT NULL,
+    root_path            TEXT NOT NULL,
+    relative_path        TEXT NOT NULL,
+    absolute_path        TEXT,
+    file_name            TEXT NOT NULL,
+    extension            TEXT,
+    size_bytes           BIGINT NOT NULL DEFAULT 0,
+    modified_at          TIMESTAMPTZ,
+    topic                TEXT,
+    category             TEXT NOT NULL DEFAULT 'unknown',
+    parser_name          TEXT,
+    supported            BOOLEAN NOT NULL DEFAULT false,
+    directly_supported   BOOLEAN NOT NULL DEFAULT false,
+    metadata_only        BOOLEAN NOT NULL DEFAULT false,
+    needs_converter      BOOLEAN NOT NULL DEFAULT false,
+    skipped_reason       TEXT,
+    status               TEXT NOT NULL DEFAULT 'discovered',
+    error                TEXT,
+    created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (batch_id, relative_path)
+);
+CREATE INDEX IF NOT EXISTS file_inventory_batch_idx
+    ON file_inventory (batch_id);
+CREATE INDEX IF NOT EXISTS file_inventory_topic_idx
+    ON file_inventory (topic);
+CREATE INDEX IF NOT EXISTS file_inventory_status_idx
+    ON file_inventory (status);
+
+CREATE TABLE IF NOT EXISTS ingestion_jobs (
+    id          BIGSERIAL PRIMARY KEY,
+    job_id      TEXT UNIQUE NOT NULL,
+    batch_id    TEXT,
+    status      TEXT NOT NULL DEFAULT 'pending',
+    total_items INT NOT NULL DEFAULT 0,
+    done_items  INT NOT NULL DEFAULT 0,
+    error       TEXT,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS ingestion_job_items (
+    id            BIGSERIAL PRIMARY KEY,
+    job_id        TEXT NOT NULL REFERENCES ingestion_jobs(job_id) ON DELETE CASCADE,
+    inventory_id  BIGINT REFERENCES file_inventory(id),
+    status        TEXT NOT NULL DEFAULT 'pending',
+    error         TEXT,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (job_id, inventory_id)
+);
+
 -- exact values pulled from spreadsheets/tables (for spec_lookup; never invent numbers)
 CREATE TABLE IF NOT EXISTS structured_facts (
     id          BIGSERIAL PRIMARY KEY,

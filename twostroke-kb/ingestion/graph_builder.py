@@ -413,6 +413,11 @@ def _chunk_props(chunk: dict[str, Any], method: str, confidence: float) -> dict[
     chunk_id = metadata.get("chunk_id", metadata.get("chunk_index"))
     page = metadata.get("page") or ref.get("page")
     source_title = metadata.get("title") or metadata.get("filename") or ref.get("filename") or ref.get("source")
+    extra = {"source_title": source_title}
+    for key in ("topic", "relative_path", "file_type", "source_title"):
+        value = metadata.get(key) or ref.get(key)
+        if value:
+            extra[key] = value
     return make_edge_props(
         doc_id=doc_id,
         chunk_id=chunk_id,
@@ -420,7 +425,7 @@ def _chunk_props(chunk: dict[str, Any], method: str, confidence: float) -> dict[
         evidence=str(chunk.get("content", "")),
         confidence=confidence,
         extraction_method=method,
-        extra={"source_title": source_title},
+        extra=extra,
     )
 
 

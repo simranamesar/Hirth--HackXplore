@@ -200,6 +200,13 @@
     .rchip{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:11px 12px}
     .rchip .rt{font-family:var(--mono);font-size:11px;color:var(--grn);margin-bottom:4px}
     .rchip .rd{font-size:11.5px;color:var(--tx3)}
+    .inventory-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:14px;align-items:start}
+    .inventory-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px}
+    .inventory-table th,.inventory-table td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;color:var(--tx2)}
+    .inventory-table th{color:var(--tx3);text-transform:uppercase;letter-spacing:.08em;font-size:9.5px}
+    .inventory-table td:last-child,.inventory-table th:last-child{text-align:right}
+    .inventory-status{font-family:var(--mono);font-size:11.5px;color:var(--tx3);margin:10px 0 0;line-height:1.45}
+    @media (max-width:980px){.inventory-grid{grid-template-columns:1fr}}
     .frow{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--panel);margin-bottom:8px;flex-wrap:wrap}
     .fname{font-size:13.5px;font-weight:600;flex:1;min-width:0;display:flex;align-items:center;gap:8px}
     .fname .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tx)}
@@ -391,8 +398,13 @@
         <span class="nlbl">Indexed Chunks</span>
         <span class="nbadge" id="chunkBadge">—</span>
       </div>
-      <div class="navi" onclick="switchTab('graph')" id="nav-graph">
+      <div class="navi" onclick="switchTab('inventory')" id="nav-inventory">
         <span class="nidx">04</span>
+        <span class="nlbl">Corpus Inventory</span>
+        <span class="nbadge" id="inventoryBadge">-</span>
+      </div>
+      <div class="navi" onclick="switchTab('graph')" id="nav-graph">
+        <span class="nidx">05</span>
         <span class="nlbl">Knowledge Graph</span>
       </div>
       <!-- entities nav hidden; tab + JS kept for future use
@@ -446,6 +458,12 @@
 
             <!-- Composer -->
             <div class="composer">
+              <div class="graph-toolrow" style="margin:0 0 8px 0">
+                <select id="topicFilter" class="graph-select" title="Topic filter">
+                  <option value="">All topics</option>
+                </select>
+                <div id="topicPresets" class="graph-filtergroup" style="flex:1"></div>
+              </div>
               <div class="composer-inner">
                 <textarea class="composer-ta" id="q" rows="1"
                   placeholder="Ask about Hirth two-stroke engines… (Enter to send, Shift+Enter for newline)"
@@ -532,6 +550,54 @@
       </div>
 
       <!-- ── Chunks tab ── -->
+      <div class="tab-panel" id="tab-inventory">
+        <div class="pad">
+          <div class="card">
+            <div class="sect">
+              Corpus Inventory
+              <button class="btn sm" style="margin-left:auto" onclick="loadInventorySummary()">Refresh</button>
+            </div>
+            <p class="muted" style="margin-bottom:12px">
+              Metadata-only scan for large Hirth folders. This does not parse, embed, or build KG facts.
+            </p>
+            <div class="graph-toolrow">
+              <input type="text" id="inventoryRoot" placeholder="Local corpus root, e.g. D:\Hirth Corpus"/>
+              <input type="text" id="inventoryMaxFiles" value="50000" style="max-width:130px" title="Max files to scan"/>
+              <button class="btn pri" onclick="scanInventory()">Scan Metadata</button>
+            </div>
+            <div class="graph-toolrow" style="margin-top:10px">
+              <input type="text" id="batchExtensions" placeholder="Extensions, e.g. pdf,pptx,docx" style="min-width:190px"/>
+              <input type="text" id="batchMaxFiles" value="25" style="max-width:90px" title="Max files to ingest"/>
+              <input type="text" id="batchMaxSizeMb" value="50" style="max-width:110px" title="Max file size MB"/>
+              <label class="toggle-chip"><input id="batchSkipExisting" type="checkbox" checked/> skip existing</label>
+              <label class="toggle-chip"><input id="batchKgEnabled" type="checkbox"/> KG</label>
+              <button class="btn" onclick="dryRunInventoryBatch()">Dry Run</button>
+              <button class="btn pri" onclick="startInventoryBatch()">Start Batch</button>
+            </div>
+            <div id="inventoryStatus" class="inventory-status">No inventory scan loaded yet.</div>
+            <div id="batchStatus" class="inventory-status">Select a topic and dry-run before ingestion.</div>
+          </div>
+
+          <div class="statrow">
+            <div class="stat"><div class="statn" id="invTotalFiles">0</div><div class="statl">Discovered files</div></div>
+            <div class="stat"><div class="statn gr" id="invTotalSize">0 B</div><div class="statl">Total size</div></div>
+            <div class="stat"><div class="statn gr" id="invSupported">0</div><div class="statl">Supported</div></div>
+            <div class="stat"><div class="statn am" id="invUnsupported">0</div><div class="statl">Metadata only</div></div>
+          </div>
+
+          <div class="inventory-grid">
+            <div class="card">
+              <div class="sect">Topics <span class="lbl" style="margin-left:auto">Grouped by Hirth folder</span></div>
+              <div id="inventoryTopics"><span class="muted">Scan a folder to see topic counts.</span></div>
+            </div>
+            <div class="card">
+              <div class="sect">File Types <span class="lbl" style="margin-left:auto">Category breakdown</span></div>
+              <div id="inventoryCategories"><span class="muted">No file types loaded.</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="tab-panel" id="tab-chunks">
         <div class="pad">
           <div class="card">
@@ -574,6 +640,9 @@
               </div>
               <div class="graph-toolrow">
                 <input type="text" id="graphSearch" placeholder="Search spark plug, misfire, overheating, carburetor" oninput="applyGraphFilters()"/>
+                <select id="graphTopicFilter" class="graph-select" onchange="loadGraph()" title="Graph topic filter">
+                  <option value="">All topics</option>
+                </select>
                 <select id="graphMinConfidence" class="graph-select" onchange="loadGraph()">
                   <option value="0.4">confidence >= 0.40</option>
                   <option value="0">show all confidence</option>
@@ -675,6 +744,9 @@
             <div style="display:flex;gap:8px;margin-bottom:16px">
               <input type="text" id="searchQuery" placeholder="e.g. Zündkerze Drehzahl, spark plug gap, fuel mixture ratio…" style="flex:1"
                 onkeydown="if(event.key==='Enter')runSearch()"/>
+              <select id="searchTopicFilter" class="graph-select" title="Search topic filter">
+                <option value="">All topics</option>
+              </select>
               <select id="searchLimit" class="graph-select">
                 <option value="10">Top 10</option>
                 <option value="20">Top 20</option>
@@ -696,6 +768,65 @@
   let last = { q: "", a: "" };
   let _abortCtrl = null;
   let _msgCount = 0;
+  let _topicRows = [];
+  let _topicPresets = [];
+
+  function _selectedTopic(selectId = "topicFilter") {
+    return (document.getElementById(selectId)?.value || "").trim();
+  }
+
+  async function loadTopics() {
+    try {
+      const resp = await fetch("/topics");
+      const data = await resp.json();
+      _topicRows = Array.isArray(data.topics) ? data.topics : [];
+      _topicPresets = Array.isArray(data.presets) ? data.presets : [];
+    } catch (_) {
+      _topicRows = [
+        {topic:"Verbrennungsmotoren"}, {topic:"Drehmomente"}, {topic:"Vibrationen"},
+        {topic:"Feinstellung-Zweitaktmotor"}, {topic:"Normen DIN ISO VDI FAR ASTM LURS"}, {topic:"Propeller"}
+      ];
+      _topicPresets = [];
+    }
+    _populateTopicSelects();
+    _renderTopicPresets();
+  }
+
+  function _populateTopicSelects() {
+    const topics = [...new Set((_topicRows || []).map(r => r.topic).filter(Boolean))];
+    ["topicFilter","searchTopicFilter","graphTopicFilter"].forEach(id => {
+      const sel = document.getElementById(id);
+      if (!sel) return;
+      const current = sel.value || "";
+      sel.innerHTML = '<option value="">All topics</option>' + topics.map(t =>
+        `<option value="${_esc(t)}">${_esc(t)}</option>`
+      ).join("");
+      if (topics.includes(current)) sel.value = current;
+    });
+  }
+
+  function _renderTopicPresets() {
+    const el = document.getElementById("topicPresets");
+    if (!el) return;
+    const presets = (_topicPresets || []).slice(0, 6);
+    el.innerHTML = presets.map((p, idx) =>
+      `<span class="filter-chip" onclick="useTopicPreset(${idx})">${_esc(p.label || p.topic || "Preset")}</span>`
+    ).join("");
+  }
+
+  function useTopicPreset(index) {
+    const preset = (_topicPresets || [])[Number(index)] || {};
+    const topic = preset.topic || "";
+    const question = preset.question || "";
+    const topicEl = document.getElementById("topicFilter");
+    if (topicEl) topicEl.value = topic || "";
+    const qEl = document.getElementById("q");
+    if (qEl && question) {
+      qEl.value = question;
+      autoResize(qEl);
+      qEl.focus();
+    }
+  }
 
   function getTheme() {
     return document.documentElement.dataset.theme === "light" ? "light" : "dark";
@@ -726,7 +857,7 @@
   });
 
   // ── Tab switching ──────────────────────────────────────────────────────
-  const TAB_LABELS = {ask:"Chat",upload:"Upload & Ingest",chunks:"Indexed Chunks",graph:"Knowledge Graph",entities:"Entities",search:"Semantic Search"};
+  const TAB_LABELS = {ask:"Chat",upload:"Upload & Ingest",inventory:"Corpus Inventory",chunks:"Indexed Chunks",graph:"Knowledge Graph",entities:"Entities",search:"Semantic Search"};
   function switchTab(name) {
     document.querySelectorAll(".navi").forEach(n => n.classList.remove("on"));
     const nav = document.getElementById("nav-" + name);
@@ -734,6 +865,7 @@
     document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
     document.getElementById("tab-" + name).classList.add("active");
     document.getElementById("pageTitle").textContent = TAB_LABELS[name] || name;
+    if (name === "inventory") loadInventorySummary();
     if (name === "graph")    loadGraph();
     if (name === "entities") loadEntities();
   }
@@ -845,11 +977,200 @@
       document.getElementById("chunkBadge").textContent = n || "—";
       document.getElementById("chunkCountLabel").textContent = n || "—";
     }).catch(() => {});
+    loadInventorySummary(false);
     fetch("/graph").then(r => r.json()).then(j => { _graphData = j; }).catch(() => {});
     fetch("/entities").then(r => r.json()).then(j => _renderEntities(j)).catch(() => {});
   }
 
   // ── Ask / stream ──────────────────────────────────────────────────────
+  const inventorySelectedTopics = new Set();
+
+  async function scanInventory() {
+    const root = document.getElementById("inventoryRoot").value.trim();
+    const maxFiles = Number(document.getElementById("inventoryMaxFiles").value || 50000);
+    const status = document.getElementById("inventoryStatus");
+    if (!root) {
+      status.textContent = "Enter a local folder path first.";
+      status.style.color = "var(--red)";
+      return;
+    }
+    status.textContent = "Scanning metadata only... no parsing, embedding, or KG extraction will run.";
+    status.style.color = "var(--amb)";
+    document.getElementById("statusLabel").textContent = "inventory";
+    document.getElementById("statusLabel").style.color = "var(--amb)";
+    const fd = new FormData();
+    fd.append("root_path", root);
+    fd.append("max_files", String(Math.max(1, maxFiles || 50000)));
+    try {
+      const resp = await fetch("/inventory/scan", { method: "POST", body: fd });
+      const data = await resp.json();
+      if (!resp.ok || data.error) throw new Error(data.error || "inventory scan failed");
+      _renderInventorySummary(data.summary || {});
+      loadTopics();
+      const scan = data.scan || {};
+      status.textContent = `Scan complete: ${scan.scanned_files || 0} files, ${scan.unsupported_count || 0} metadata-only, ${scan.errors_count || 0} errors, ${scan.elapsed_seconds || 0}s.${scan.limit_reached ? " Limit reached." : ""}`;
+      status.style.color = "var(--grn)";
+      document.getElementById("statusLabel").textContent = "ready";
+      document.getElementById("statusLabel").style.color = "var(--grn)";
+    } catch (e) {
+      status.textContent = "Inventory scan failed: " + e.message;
+      status.style.color = "var(--red)";
+      document.getElementById("statusLabel").textContent = "error";
+      document.getElementById("statusLabel").style.color = "var(--red)";
+    }
+  }
+
+  async function loadInventorySummary(showErrors = true) {
+    try {
+      const resp = await fetch("/inventory/summary");
+      const data = await resp.json();
+      if (data.error && showErrors) throw new Error(data.error);
+      _renderInventorySummary(data);
+    } catch (e) {
+      if (showErrors) {
+        const status = document.getElementById("inventoryStatus");
+        if (status) {
+          status.textContent = "Could not load inventory summary: " + e.message;
+          status.style.color = "var(--red)";
+        }
+      }
+    }
+  }
+
+  function _renderInventorySummary(summary) {
+    const total = Number(summary.total_files || 0);
+    const totalSize = Number(summary.total_size_bytes || 0);
+    const byTopic = summary.by_topic || [];
+    const byCategory = summary.by_category || [];
+    const supported = byTopic.reduce((n, r) => n + Number(r.supported || 0), 0);
+    const unsupported = byTopic.reduce((n, r) => n + Number(r.unsupported || 0), 0);
+    document.getElementById("invTotalFiles").textContent = total.toLocaleString();
+    document.getElementById("invTotalSize").textContent = _fmtBytes(totalSize);
+    document.getElementById("invSupported").textContent = supported.toLocaleString();
+    document.getElementById("invUnsupported").textContent = unsupported.toLocaleString();
+    document.getElementById("inventoryBadge").textContent = total ? total.toLocaleString() : "-";
+    document.getElementById("inventoryTopics").innerHTML = _inventoryTopicTable(
+      byTopic.slice(0, 20).map(r => ({
+        label: r.topic || r.key || "Unsorted",
+        count: r.count || 0,
+        size: r.size_bytes || 0,
+        right: `${Number(r.supported || 0).toLocaleString()} supported`
+      }))
+    );
+    document.getElementById("inventoryCategories").innerHTML = _inventoryTable(
+      byCategory.slice(0, 12).map(r => ({
+        label: r.category || r.key || "unknown",
+        count: r.count || 0,
+        size: r.size_bytes || 0,
+        right: _fmtBytes(r.size_bytes || 0)
+      })),
+      "Category"
+    );
+  }
+
+  function _inventoryTable(rows, label) {
+    if (!rows.length) return '<span class="muted">No inventory data yet.</span>';
+    return `<table class="inventory-table"><thead><tr><th>${label}</th><th>Files</th><th>Size</th><th></th></tr></thead><tbody>` +
+      rows.map(r => `<tr><td>${_esc(r.label)}</td><td>${Number(r.count || 0).toLocaleString()}</td><td>${_fmtBytes(r.size || 0)}</td><td>${_esc(r.right || "")}</td></tr>`).join("") +
+      `</tbody></table>`;
+  }
+
+  function _inventoryTopicTable(rows) {
+    if (!rows.length) return '<span class="muted">No inventory data yet.</span>';
+    return `<table class="inventory-table"><thead><tr><th>Topic</th><th>Files</th><th>Size</th><th>Select</th></tr></thead><tbody>` +
+      rows.map(r => {
+        const checked = inventorySelectedTopics.has(r.label) ? "checked" : "";
+        return `<tr><td>${_esc(r.label)}</td><td>${Number(r.count || 0).toLocaleString()}</td><td>${_fmtBytes(r.size || 0)}</td><td><input type="checkbox" data-topic="${_esc(r.label)}" ${checked} onchange="toggleInventoryTopic(this.dataset.topic, this.checked)" title="Select for later batch ingestion"/></td></tr>`;
+      }).join("") +
+      `</tbody></table><div class="inventory-status">${inventorySelectedTopics.size ? inventorySelectedTopics.size + " topic(s) selected for later selective ingestion." : "Select topics here; ingestion will be added in the next batch step."}</div>`;
+  }
+
+  function toggleInventoryTopic(topic, checked) {
+    if (checked) inventorySelectedTopics.add(topic);
+    else inventorySelectedTopics.delete(topic);
+    const status = document.getElementById("inventoryStatus");
+    if (status) {
+      status.textContent = inventorySelectedTopics.size
+        ? `${inventorySelectedTopics.size} topic(s) selected for future batch ingestion.`
+        : "No topics selected yet.";
+      status.style.color = "var(--tx3)";
+    }
+  }
+
+  function _batchFormData(dryRun) {
+    const fd = new FormData();
+    const topics = Array.from(inventorySelectedTopics);
+    fd.append("topic", topics[0] || "");
+    fd.append("extensions", document.getElementById("batchExtensions").value.trim());
+    fd.append("max_files", document.getElementById("batchMaxFiles").value || "25");
+    fd.append("max_file_size_mb", document.getElementById("batchMaxSizeMb").value || "50");
+    fd.append("skip_existing", document.getElementById("batchSkipExisting").checked ? "true" : "false");
+    fd.append("kg_enabled", document.getElementById("batchKgEnabled").checked ? "true" : "false");
+    fd.append("kg_max_chunks_per_doc", "20");
+    fd.append("dry_run", dryRun ? "true" : "false");
+    return fd;
+  }
+
+  async function dryRunInventoryBatch() {
+    const el = document.getElementById("batchStatus");
+    el.textContent = "Running dry-run selection...";
+    el.style.color = "var(--amb)";
+    try {
+      const resp = await fetch("/inventory/ingest-selected", { method: "POST", body: _batchFormData(true) });
+      const data = await resp.json();
+      if (!resp.ok || data.error) throw new Error(data.error || "dry run failed");
+      el.innerHTML = _renderBatchReport(data, "Dry run");
+      el.style.color = "var(--tx2)";
+    } catch (e) {
+      el.textContent = "Dry run failed: " + e.message;
+      el.style.color = "var(--red)";
+    }
+  }
+
+  async function startInventoryBatch() {
+    const el = document.getElementById("batchStatus");
+    el.textContent = "Starting controlled batch ingestion...";
+    el.style.color = "var(--amb)";
+    document.getElementById("statusLabel").textContent = "batch";
+    document.getElementById("statusLabel").style.color = "var(--amb)";
+    try {
+      const resp = await fetch("/inventory/ingest-selected", { method: "POST", body: _batchFormData(false) });
+      const data = await resp.json();
+      if (!resp.ok || data.error) throw new Error(data.error || "batch ingestion failed");
+      el.innerHTML = _renderBatchReport(data, "Batch complete");
+      el.style.color = "var(--tx2)";
+      document.getElementById("statusLabel").textContent = "ready";
+      document.getElementById("statusLabel").style.color = "var(--grn)";
+      loadInventorySummary(false);
+      _refreshAllDataTabs();
+    } catch (e) {
+      el.textContent = "Batch ingestion failed: " + e.message;
+      el.style.color = "var(--red)";
+      document.getElementById("statusLabel").textContent = "error";
+      document.getElementById("statusLabel").style.color = "var(--red)";
+    }
+  }
+
+  function _renderBatchReport(data, title) {
+    const reasons = Object.entries(data.skip_reasons || {}).map(([k,v]) => `${_esc(k)}: ${v}`).join(", ") || "none";
+    const job = data.job_id ? `<div>Job: <b>${_esc(data.job_id)}</b></div>` : "";
+    return `<div><b>${title}</b></div>
+      ${job}
+      <div>Selected: <b>${Number(data.selected_count || 0).toLocaleString()}</b> files (${_fmtBytes(data.total_size_bytes || 0)})</div>
+      <div>Completed: ${Number(data.completed || 0).toLocaleString()} · Failed: ${Number(data.failed || 0).toLocaleString()} · Skipped: ${Number(data.skipped_count || data.skipped || 0).toLocaleString()}</div>
+      <div>Skip reasons: ${reasons}</div>`;
+  }
+
+  function _fmtBytes(bytes) {
+    const n = Number(bytes || 0);
+    if (n < 1024) return `${n} B`;
+    const units = ["KB","MB","GB","TB"];
+    let value = n / 1024;
+    let idx = 0;
+    while (value >= 1024 && idx < units.length - 1) { value /= 1024; idx++; }
+    return `${value.toFixed(value >= 10 ? 1 : 2)} ${units[idx]}`;
+  }
+
   async function ask() {
     const q = document.getElementById("q").value.trim();
     if (!q) return;
@@ -893,6 +1214,7 @@
     const fd = new FormData();
     fd.append("question",   q);
     fd.append("session_id", SID);
+    fd.append("topic", _selectedTopic("topicFilter"));
 
     let firstDelta = true;
     let fullAnswer = "";
@@ -986,12 +1308,13 @@
     wrap.className = "inline-evidence";
     wrap.innerHTML = `<div class="inline-evidence-hdr">Evidence (${citations.length} sources)</div>` +
       citations.map(c => {
-        const page = c.page ? ` · p.${c.page}` : "";
+        const loc = _sourceLocation(c);
+        const topic = c.topic ? `${_esc(c.topic)} / ` : "";
         const onclick = c.id ? `onclick="viewChunk(${c.id})"` : "";
         return `<div class="ev-card" ${onclick}>
           <div class="ev-n">[${c.n}]</div>
           <div class="ev-body">
-            <div class="ev-filename">${_esc(c.filename || c.doc_id || "unknown")}${page}</div>
+            <div class="ev-filename">${topic}${_esc(c.source_title || c.filename || c.doc_id || "unknown")}${loc ? " · " + _esc(loc) : ""}</div>
             <div class="ev-snippet">${_esc((c.snippet || "").slice(0, 180))}</div>
           </div>
         </div>`;
@@ -1042,6 +1365,18 @@
     return "fmt-default";
   }
 
+  function _sourceLocation(item) {
+    if (!item) return "";
+    if (item.page) return `p.${item.page}`;
+    if (item.slide) return `slide ${item.slide}`;
+    if (item.sheet) return `sheet ${item.sheet}`;
+    const meta = item.metadata || {};
+    if (meta.page) return `p.${meta.page}`;
+    if (meta.slide) return `slide ${meta.slide}`;
+    if (meta.sheet || meta.table_name) return `sheet ${meta.sheet || meta.table_name}`;
+    return "";
+  }
+
   function _renderSourceCards(citations) {
     if (!citations.length) return;
     const sec = document.getElementById("sourcesSection");
@@ -1050,15 +1385,17 @@
     document.getElementById("sourceCount").textContent = citations.length + " sources";
     cards.innerHTML = citations.map(c => {
       const ext = (c.filename || "").split(".").pop().toUpperCase() || "DOC";
-      const page = c.page ? ` · p.${c.page}` : "";
+      const loc = _sourceLocation(c);
+      const topic = c.topic ? `<span class="tag fmt-default">${_esc(c.topic)}</span>` : "";
       const viewAttr = c.id ? `onclick="viewChunk(${c.id})"` : "";
       return `<div class="srccard" ${viewAttr}>
         <div class="srccard-top">
           <span class="tag ${_fmtClass(c.filename)}">${ext}</span>
-          <span class="srccard-name">${c.filename || c.doc_id || "unknown"}</span>
-          <span class="srccard-page">${page}</span>
+          ${topic}
+          <span class="srccard-name">${_esc(c.source_title || c.filename || c.doc_id || "unknown")}</span>
+          <span class="srccard-page">${loc ? _esc(loc) : ""}</span>
         </div>
-        <div class="srccard-snippet">${(c.snippet||"").slice(0,140)}…</div>
+        <div class="srccard-snippet">${_esc((c.snippet||"").slice(0,140))}...</div>
       </div>`;
     }).join("");
   }
@@ -1313,6 +1650,9 @@
       confidence: edge?.confidence ?? props.confidence ?? null,
       evidence: edge?.evidence || props.evidence || "",
       extraction_method: edge?.extraction_method || props.extraction_method || "unknown",
+      topic: edge?.topic || props.topic || "",
+      relative_path: edge?.relative_path || props.relative_path || "",
+      file_type: edge?.file_type || props.file_type || "",
       props
     };
   }
@@ -1333,7 +1673,9 @@
     set("graphTotalEdges", _graphAllEdges.length);
     set("graphVisibleNodes", (_graphFiltered.nodes || []).length);
     set("graphVisibleEdges", (_graphFiltered.edges || []).length);
-    set("graphModeStat", graphMode === "full" ? "Full" : graphMode.charAt(0).toUpperCase() + graphMode.slice(1));
+    const modeLabel = graphMode === "full" ? "Full" : graphMode.charAt(0).toUpperCase() + graphMode.slice(1);
+    const topic = _selectedTopic("graphTopicFilter");
+    set("graphModeStat", topic ? `${modeLabel} / ${topic.slice(0, 18)}` : modeLabel);
     const focused = focusedNodeId ? _nodeById(focusedNodeId) : null;
     set("graphFocusStat", focused ? _nodeLabel(focused).slice(0, 18) : "None");
   }
@@ -1345,8 +1687,10 @@
     const showWeak = document.getElementById("graphShowWeak")?.checked;
     const showSeed = document.getElementById("graphShowSeed")?.checked !== false;
     const minConfidence = showWeak ? "0" : (minEl?.value || "0.4");
+    const topic = _selectedTopic("graphTopicFilter");
     try {
       const params = new URLSearchParams({ limit: "1200", min_confidence: minConfidence, include_seed: String(showSeed) });
+      if (topic) params.set("topic", topic);
       const r = await fetch(`/graph?${params.toString()}`);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       _graphData = await r.json();
@@ -2262,11 +2606,14 @@
   async function runSearch() {
     const q = document.getElementById("searchQuery").value.trim();
     const limit = document.getElementById("searchLimit").value;
+    const topic = _selectedTopic("searchTopicFilter");
     const el = document.getElementById("searchResults");
     if (!q) return;
     el.innerHTML = '<span class="spinner"></span> Searching…';
     try {
-      const r = await fetch(`/search?q=${encodeURIComponent(q)}&limit=${limit}`);
+      const params = new URLSearchParams({ q, limit });
+      if (topic) params.set("topic", topic);
+      const r = await fetch(`/search?${params.toString()}`);
       const j = await r.json();
       if (j.error && !j.results.length) {
         el.innerHTML = `<span class="muted">Error: ${j.error}</span>`; return;
@@ -2275,20 +2622,23 @@
         el.innerHTML = '<span class="muted">No results found. Try a different query or upload more documents.</span>'; return;
       }
       const mode = j.mode === "fulltext_fallback" ? ' <span style="color:var(--amb);font-family:var(--mono);font-size:10px">(full-text fallback)</span>' : '';
-      el.innerHTML = `<div class="lbl" style="margin-bottom:10px">${j.results.length} results${mode}</div>` +
+      const topicLabel = topic ? ` in ${_esc(topic)}` : "";
+      el.innerHTML = `<div class="lbl" style="margin-bottom:10px">${j.results.length} results${topicLabel}${mode}</div>` +
         j.results.map((r, i) => {
           const ext = (r.filename || r.doc_id || "").split(".").pop().toUpperCase() || "DOC";
           const fmtCls = _fmtClass(r.filename || r.doc_id || "");
           const score = (r.score * 100).toFixed(1);
-          const page = r.metadata?.page ? ` · p.${r.metadata.page}` : "";
+          const loc = _sourceLocation(r);
+          const rowTopic = r.topic || r.metadata?.topic || "";
           return `<div class="srccard" onclick="viewChunk(${r.id})" style="margin-bottom:8px">
             <div class="srccard-top">
               <span class="tag ${fmtCls}">${ext}</span>
-              <span class="srccard-name">${r.filename || r.doc_id || "unknown"}</span>
-              <span class="srccard-page">${page}</span>
+              ${rowTopic ? `<span class="tag fmt-default">${_esc(rowTopic)}</span>` : ""}
+              <span class="srccard-name">${_esc(r.source_title || r.filename || r.doc_id || "unknown")}</span>
+              <span class="srccard-page">${loc ? _esc(loc) : ""}</span>
               <span style="margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--grn)">${score}%</span>
             </div>
-            <div class="srccard-snippet">${r.snippet}</div>
+            <div class="srccard-snippet">${_esc(r.snippet || "")}</div>
           </div>`;
         }).join("");
     } catch (e) {
@@ -2297,6 +2647,7 @@
   }
 
   // Initial data refresh
+  loadTopics();
   _refreshAllDataTabs();
 </script>
 </body>

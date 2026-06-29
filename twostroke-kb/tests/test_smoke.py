@@ -24,6 +24,20 @@ def test_format_router_known_ext():
     assert EXT_MAP[".url"] == "link"
 
 
+def test_topic_inference_and_boost():
+    from agent.retriever_hybrid import _apply_topic_boost, infer_topic
+
+    assert infer_topic("What torque specs are available?") == "Drehmomente"
+    assert infer_topic("Show propeller guidance") == "Propeller"
+    chunks = [
+        {"id": 1, "score": 0.5, "metadata": {"topic": "Drehmomente"}, "source_refs": []},
+        {"id": 2, "score": 0.51, "metadata": {"topic": "Propeller"}, "source_refs": []},
+    ]
+    boosted = _apply_topic_boost(chunks, "Drehmomente")
+    assert boosted[0]["id"] == 1
+    assert boosted[0]["topic_boost"] == "Drehmomente"
+
+
 def test_link_handler_extracts_url(tmp_path):
     from ingestion.parsers import link_handler
 
@@ -788,6 +802,9 @@ def test_api_graph_endpoint_supports_filters_and_rich_metadata():
             "confidence": 0.82,
             "extraction_method": "rule",
             "source_title": "Manual",
+            "topic": "Drehmomente",
+            "relative_path": "17. Drehmomente/manual.pdf",
+            "file_type": "pdf",
         }),
         (11, 1, 2, "RELATED_TO", {
             "doc_id": "manual.pdf",
@@ -805,7 +822,7 @@ def test_api_graph_endpoint_supports_filters_and_rich_metadata():
         client = TestClient(app)
         resp = client.get(
             "/graph?edge_type=HAS_SPEC&doc_id=manual.pdf&min_confidence=0.5"
-            "&extraction_method=rule&include_seed=false"
+            "&extraction_method=rule&include_seed=false&topic=Drehmomente"
         )
 
     data = resp.json()
@@ -817,8 +834,11 @@ def test_api_graph_endpoint_supports_filters_and_rich_metadata():
     assert edge["evidence"] == "Spark plug temperature 700°C."
     assert edge["source_chunk_id"] == 4
     assert edge["source_title"] == "Manual"
+    assert edge["topic"] == "Drehmomente"
+    assert edge["relative_path"] == "17. Drehmomente/manual.pdf"
     assert data["nodes"][0]["label"] == "Spark Plug"
     assert data["filters"]["edge_type"] == "HAS_SPEC"
+    assert data["filters"]["topic"] == "Drehmomente"
 
 
 def test_graph_diagnostic_paths_endpoint():
@@ -1134,8 +1154,12 @@ def test_ask_stream_includes_optional_kg_metadata_and_prompt_context():
         "id": 1,
         "doc_id": "manual.pdf",
         "content": "Engine misfire may be caused by spark plug fouling.",
-        "source_refs": [{"filename": "manual.pdf", "page": 12}],
-        "metadata": {},
+        "source_refs": [{"filename": "manual.pdf", "page": 12, "topic": "Verbrennungsmotoren"}],
+        "metadata": {
+            "topic": "Verbrennungsmotoren",
+            "relative_path": "02. Verbrennungsmotoren/manual.pdf",
+            "source_title": "Hirth Manual",
+        },
     }
     kg_result = {
         "intent": {"intent": "diagnostic_cause", "is_kg_relevant": True, "triggers": ["why"]},
@@ -1155,16 +1179,27 @@ def test_ask_stream_includes_optional_kg_metadata_and_prompt_context():
         assert "Knowledge Graph evidence" in messages[0]["content"]
         return iter(["Check ", "the spark plug."])
 
-    with patch("agent.retriever_hybrid.search", return_value=[chunk]), \
+    def fake_search(query, k=None, topic=None):
+        assert topic == "Verbrennungsmotoren"
+        return [chunk]
+
+    with patch("agent.retriever_hybrid.search", side_effect=fake_search), \
          patch("agent.reranker.rerank", return_value=[chunk]), \
          patch("agent.kg_retrieval.retrieve_kg_context", return_value=kg_result), \
          patch("agent.verifier.is_grounded", return_value=True), \
          patch("agent.recommender.related", return_value=[]), \
+         patch("memory.store.get_conversation", return_value=[]), \
+         patch("memory.store.append_turn", return_value=None), \
          patch("llm.stream_chat", side_effect=fake_stream_chat):
         client = TestClient(app)
         resp = client.post(
             "/ask/stream",
-            data={"question": "Why does the engine misfire?", "session_id": "kg-test", "expertise": "expert"},
+            data={
+                "question": "Why does the engine misfire?",
+                "session_id": "kg-test",
+                "expertise": "expert",
+                "topic": "Verbrennungsmotoren",
+            },
         )
 
     events = []
@@ -1176,6 +1211,8 @@ def test_ask_stream_includes_optional_kg_metadata_and_prompt_context():
     assert done["intent"]["intent"] == "diagnostic_cause"
     assert done["kg_paths"][0]["path"].startswith("Misfire --CAUSED_BY")
     assert "citations" in done
+    assert done["citations"][0]["topic"] == "Verbrennungsmotoren"
+    assert done["citations"][0]["relative_path"] == "02. Verbrennungsmotoren/manual.pdf"
 
 
 def test_document_versioning_increments():
@@ -1202,4 +1239,139 @@ def test_ingest_result_has_version_field():
 
     r = IngestResult(filename="a.pdf", chunks=5, facts=2, skipped_duplicates=1, version=3)
     assert r.version == 3
+
+
+# --- Large-corpus inventory -------------------------------------------------
+
+def test_inventory_classifies_supported_and_metadata_only_extensions():
+    """Inventory classification must avoid parsing while flagging support status."""
+    from ingestion.inventory import classify_extension
+
+    pdf = classify_extension("manual.pdf")
+    assert pdf["category"] == "documents"
+    assert pdf["supported"] is True
+    assert pdf["parser_name"] == "pdf_or_ocr"
+
+    pptx = classify_extension("2015-10-01_Isolated_combustion_chamber.pptx")
+    assert pptx["category"] == "presentations"
+    assert pptx["supported"] is True
+    assert pptx["parser_name"] == "pptx"
+
+    cad = classify_extension("housing.step")
+    assert cad["category"] == "cad_engineering"
+    assert cad["supported"] is False
+    assert cad["metadata_only"] is True
+    assert cad["skipped_reason"] == "metadata_only_cad"
+
+
+def test_inventory_scan_fake_folder_metadata_only(tmp_path):
+    """Scanner records metadata, groups by topic, and does not require parsing."""
+    from unittest.mock import patch
+    from ingestion.inventory import scan_inventory
+
+    topic = tmp_path / "18. Drehmomente"
+    cad_topic = tmp_path / "01. CAD"
+    hidden = tmp_path / ".git"
+    topic.mkdir()
+    cad_topic.mkdir()
+    hidden.mkdir()
+    (topic / "torque.pdf").write_text("not parsed", encoding="utf-8")
+    (topic / "notes.pptx").write_text("not parsed", encoding="utf-8")
+    (cad_topic / "housing.step").write_text("not parsed", encoding="utf-8")
+    (hidden / "ignored.pdf").write_text("not parsed", encoding="utf-8")
+
+    with patch("ingestion.inventory.store_inventory_items") as store_mock:
+        result = scan_inventory(tmp_path, max_files=20, batch_id="test-batch")
+
+    store_mock.assert_called_once()
+    assert result["scan"]["scanned_files"] == 3
+    assert result["scan"]["unsupported_count"] == 1
+    assert result["summary"]["total_files"] == 3
+    assert result["summary"]["supported_files"] == 2
+    topics = {row["topic"]: row for row in result["summary"]["by_topic"]}
+    assert topics["Drehmomente"]["count"] == 2
+    assert topics["CAD"]["unsupported"] == 1
+
+
+def test_inventory_api_endpoints_shape():
+    """Inventory API keeps a stable, demo-friendly JSON shape."""
+    from fastapi.testclient import TestClient
+    from unittest.mock import patch
+    from api.main import app
+
+    summary = {
+        "total_files": 3,
+        "total_size_bytes": 1234,
+        "by_topic": [{"topic": "Drehmomente", "count": 2, "size_bytes": 1000, "supported": 2, "unsupported": 0}],
+        "by_category": [{"category": "documents", "count": 2, "size_bytes": 1000}],
+        "by_extension": [{"extension": ".pdf", "count": 1, "size_bytes": 500}],
+        "by_status": [{"status": "discovered", "count": 3}],
+    }
+
+    with patch("ingestion.inventory.inventory_summary", return_value=summary), \
+         patch("ingestion.inventory.list_inventory", return_value=[{"file_name": "torque.pdf"}]):
+        client = TestClient(app)
+        resp = client.get("/inventory/summary")
+        assert resp.status_code == 200
+        assert resp.json()["total_files"] == 3
+
+        listing = client.get("/inventory")
+        assert listing.status_code == 200
+        assert listing.json()["items"][0]["file_name"] == "torque.pdf"
+
+
+def test_inventory_ingest_selected_endpoint_dry_run_and_start():
+    """Batch endpoint supports dry-run and controlled ingestion modes."""
+    from fastapi.testclient import TestClient
+    from unittest.mock import patch
+    from api.main import app
+
+    dry = {"dry_run": True, "selected_count": 2, "total_size_bytes": 100, "skipped_count": 1}
+    started = {"dry_run": False, "job_id": "job-test", "status": "completed", "completed": 2, "failed": 0}
+
+    with patch("ingestion.inventory.dry_run_selected", return_value=dry) as dry_mock, \
+         patch("ingestion.inventory.ingest_selected", return_value=started) as ingest_mock:
+        client = TestClient(app)
+        resp = client.post(
+            "/inventory/ingest-selected",
+            data={
+                "topic": "Drehmomente",
+                "extensions": "pdf,pptx",
+                "max_files": "5",
+                "max_file_size_mb": "20",
+                "skip_existing": "true",
+                "dry_run": "true",
+            },
+        )
+        assert resp.status_code == 200
+        assert resp.json()["selected_count"] == 2
+        dry_mock.assert_called_once()
+
+        resp = client.post(
+            "/inventory/ingest-selected",
+            data={
+                "topic": "Drehmomente",
+                "extensions": "pdf",
+                "max_files": "2",
+                "kg_enabled": "false",
+                "dry_run": "false",
+            },
+        )
+        assert resp.status_code == 200
+        assert resp.json()["job_id"] == "job-test"
+        ingest_mock.assert_called_once()
+
+
+def test_pptx_chunks_include_slide_metadata():
+    """PPTX slide headers should flow into chunk metadata/source refs."""
+    from ingestion.parsers import pptx_parser
+    from ingestion.chunker import chunk
+
+    doc = pptx_parser.parse(FIXTURES / "sample.pptx")
+    chunks = chunk(doc)
+    slide_chunks = [c for c in chunks if c["metadata"].get("slide")]
+
+    assert slide_chunks
+    assert slide_chunks[0]["metadata"]["slide"] == 1
+    assert slide_chunks[0]["source_refs"][0]["slide"] == 1
 

@@ -9,8 +9,37 @@ log = logging.getLogger(__name__)
 
 _RRF_K = 60  # standard RRF constant; higher k reduces the impact of rank differences
 
+TOPIC_PRESETS = {
+    "torque": "Drehmomente",
+    "drehmoment": "Drehmomente",
+    "fine tuning": "Feinstellung-Zweitaktmotor",
+    "feinstellung": "Feinstellung-Zweitaktmotor",
+    "zweitakt": "Feinstellung-Zweitaktmotor",
+    "standard": "Normen DIN ISO VDI FAR ASTM LURS",
+    "standards": "Normen DIN ISO VDI FAR ASTM LURS",
+    "normen": "Normen DIN ISO VDI FAR ASTM LURS",
+    "din": "Normen DIN ISO VDI FAR ASTM LURS",
+    "iso": "Normen DIN ISO VDI FAR ASTM LURS",
+    "far": "Normen DIN ISO VDI FAR ASTM LURS",
+    "vibration": "Vibrationen",
+    "vibrationen": "Vibrationen",
+    "propeller": "Propeller",
+    "combustion": "Verbrennungsmotoren",
+    "engine": "Verbrennungsmotoren",
+    "verbrennung": "Verbrennungsmotoren",
+}
 
-def search(query: str, k: int | None = None) -> list[dict[str, Any]]:
+
+def infer_topic(query: str) -> str | None:
+    """Infer a likely Hirth corpus topic from a question, if obvious."""
+    folded = (query or "").casefold()
+    for trigger, topic in TOPIC_PRESETS.items():
+        if trigger in folded:
+            return topic
+    return None
+
+
+def search(query: str, k: int | None = None, topic: str | None = None) -> list[dict[str, Any]]:
     """Return top-k chunks fused from BM25 and dense cosine retrieval.
 
     Each leg retrieves 2× top-k candidates; RRF scores are combined; final
@@ -22,11 +51,13 @@ def search(query: str, k: int | None = None) -> list[dict[str, Any]]:
     settings = get_settings()
     top_k = k if k is not None else settings.retrieve_top_k
     candidate_k = top_k * 2
+    topic = (topic or "").strip() or None
+    boost_topic = topic or infer_topic(query)
 
-    dense = _dense_search(query, candidate_k)
+    dense = _dense_search(query, candidate_k, topic=topic)
 
     try:
-        sparse = _bm25_search(query, candidate_k)
+        sparse = _bm25_search(query, candidate_k, topic=topic)
     except Exception:
         log.warning("retriever_hybrid: BM25 failed; falling back to dense-only")
         sparse = []
@@ -36,6 +67,8 @@ def search(query: str, k: int | None = None) -> list[dict[str, Any]]:
     else:
         results = _rrf_fuse(dense, sparse, top_k)
 
+    if boost_topic:
+        results = _apply_topic_boost(results, boost_topic)
     return _apply_feedback_boost(results)
 
 
@@ -43,7 +76,7 @@ def search(query: str, k: int | None = None) -> list[dict[str, Any]]:
 # Dense leg
 # ---------------------------------------------------------------------------
 
-def _dense_search(query: str, top_k: int) -> list[dict[str, Any]]:
+def _dense_search(query: str, top_k: int, topic: str | None = None) -> list[dict[str, Any]]:
     from config import get_connection, get_settings
     from ingestion.knowledge_base import _embedder
 
@@ -53,16 +86,29 @@ def _dense_search(query: str, top_k: int) -> list[dict[str, Any]]:
     conn = get_connection()
     try:
         cur = conn.cursor()
-        cur.execute(
-            """
-            SELECT id, doc_id, content, source_refs, metadata,
-                   1 - (embedding <=> %s::vector) AS score
-            FROM chunks
-            ORDER BY embedding <=> %s::vector
-            LIMIT %s
-            """,
-            (str(vec), str(vec), top_k),
-        )
+        if topic:
+            cur.execute(
+                """
+                SELECT id, doc_id, content, source_refs, metadata,
+                       1 - (embedding <=> %s::vector) AS score
+                FROM chunks
+                WHERE metadata->>'topic' = %s
+                ORDER BY embedding <=> %s::vector
+                LIMIT %s
+                """,
+                (str(vec), topic, str(vec), top_k),
+            )
+        else:
+            cur.execute(
+                """
+                SELECT id, doc_id, content, source_refs, metadata,
+                       1 - (embedding <=> %s::vector) AS score
+                FROM chunks
+                ORDER BY embedding <=> %s::vector
+                LIMIT %s
+                """,
+                (str(vec), str(vec), top_k),
+            )
         rows = cur.fetchall()
     finally:
         conn.close()
@@ -79,16 +125,22 @@ def _tokenize(text: str) -> list[str]:
     return text.lower().split()
 
 
-def _bm25_search(query: str, top_k: int) -> list[dict[str, Any]]:
+def _bm25_search(query: str, top_k: int, topic: str | None = None) -> list[dict[str, Any]]:
     from rank_bm25 import BM25Okapi
     from config import get_connection
 
     conn = get_connection()
     try:
         cur = conn.cursor()
-        cur.execute(
-            "SELECT id, doc_id, content, source_refs, metadata FROM chunks"
-        )
+        if topic:
+            cur.execute(
+                "SELECT id, doc_id, content, source_refs, metadata FROM chunks WHERE metadata->>'topic' = %s",
+                (topic,),
+            )
+        else:
+            cur.execute(
+                "SELECT id, doc_id, content, source_refs, metadata FROM chunks"
+            )
         rows = cur.fetchall()
     finally:
         conn.close()
@@ -191,6 +243,27 @@ def _fetch_vote_totals(chunk_ids: list[int]) -> dict[int, int]:
     except Exception:
         log.debug("retriever_hybrid: could not fetch vote totals; skipping boost")
         return {}
+
+
+def _apply_topic_boost(chunks: list[dict[str, Any]], topic: str) -> list[dict[str, Any]]:
+    """Mildly boost chunks from an inferred topic without hiding other results."""
+    if not chunks:
+        return chunks
+    for chunk in chunks:
+        if _chunk_topic(chunk) == topic:
+            chunk["score"] = float(chunk.get("score", 0.0)) * 1.18 + 0.01
+            chunk["topic_boost"] = topic
+    return sorted(chunks, key=lambda c: c.get("score", 0.0), reverse=True)
+
+
+def _chunk_topic(chunk: dict[str, Any]) -> str | None:
+    metadata = chunk.get("metadata") or {}
+    if metadata.get("topic"):
+        return str(metadata["topic"])
+    refs = chunk.get("source_refs") or []
+    if refs and isinstance(refs[0], dict) and refs[0].get("topic"):
+        return str(refs[0]["topic"])
+    return None
 
 
 # ---------------------------------------------------------------------------
